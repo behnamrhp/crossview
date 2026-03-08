@@ -86,10 +86,10 @@ tests:
           value: "info"
       - equal:
           path: data.OIDC_ENABLED
-          value: "true"
+          value: "false"
       - equal:
           path: data.SAML_ENABLED
-          value: "true"
+          value: "false"
 
   - it: should use custom config values when provided
     set:
