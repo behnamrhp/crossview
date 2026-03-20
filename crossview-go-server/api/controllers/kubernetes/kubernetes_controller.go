@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"crossview-go-server/lib"
 	"crossview-go-server/services"
+	"github.com/gin-gonic/gin"
 )
 
 type KubernetesController struct {
@@ -119,7 +119,7 @@ func (c *KubernetesController) GetResources(ctx *gin.Context) {
 
 	result, err := c.kubernetesService.GetResources(apiVersion, kind, namespace, contextName, plural, limit, continueToken)
 	if err != nil {
-		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "NotFound") {
+		if lib.IsMissingKubernetesResourceError(err) {
 			ctx.JSON(http.StatusOK, gin.H{
 				"items":              []interface{}{},
 				"continueToken":      nil,
@@ -241,9 +241,9 @@ func (c *KubernetesController) AddKubeConfig(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"success": true,
+		"success":       true,
 		"addedContexts": addedContexts,
-		"message": fmt.Sprintf("Successfully added %d context(s)", len(addedContexts)),
+		"message":       fmt.Sprintf("Successfully added %d context(s)", len(addedContexts)),
 	})
 }
 

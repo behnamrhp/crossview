@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 
+	"crossview-go-server/lib"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -55,7 +56,7 @@ func (k *KubernetesService) GetResources(apiVersion, kind, namespace, contextNam
 		k.mu.RLock()
 		cachedPlural, exists := k.pluralCache[cacheKey]
 		k.mu.RUnlock()
-		
+
 		if exists {
 			plural = cachedPlural
 		} else {
@@ -97,7 +98,7 @@ func (k *KubernetesService) GetResources(apiVersion, kind, namespace, contextNam
 	if namespace != "" && namespace != "undefined" && namespace != "null" {
 		list, listErr := dynamicClient.Resource(gvr).Namespace(namespace).List(context.Background(), listOptions)
 		if listErr != nil {
-			if strings.Contains(listErr.Error(), "404") || strings.Contains(listErr.Error(), "NotFound") || strings.Contains(listErr.Error(), "does not exist") {
+			if lib.IsMissingKubernetesResourceError(listErr) {
 				return map[string]interface{}{
 					"items":              []interface{}{},
 					"continueToken":      nil,
@@ -118,7 +119,7 @@ func (k *KubernetesService) GetResources(apiVersion, kind, namespace, contextNam
 	} else {
 		list, listErr := dynamicClient.Resource(gvr).List(context.Background(), listOptions)
 		if listErr != nil {
-			if strings.Contains(listErr.Error(), "404") || strings.Contains(listErr.Error(), "NotFound") || strings.Contains(listErr.Error(), "does not exist") {
+			if lib.IsMissingKubernetesResourceError(listErr) {
 				return map[string]interface{}{
 					"items":              []interface{}{},
 					"continueToken":      nil,
@@ -285,7 +286,7 @@ func (k *KubernetesService) GetResource(apiVersion, kind, name, namespace, conte
 		k.mu.RLock()
 		cachedPlural, exists := k.pluralCache[cacheKey]
 		k.mu.RUnlock()
-		
+
 		if exists {
 			plural = cachedPlural
 		} else {
@@ -340,4 +341,3 @@ func (k *KubernetesService) GetResource(apiVersion, kind, name, namespace, conte
 
 	return k.objectToMap(obj), nil
 }
-

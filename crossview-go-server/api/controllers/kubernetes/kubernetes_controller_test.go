@@ -316,6 +316,42 @@ func TestKubernetesController_GetResources_NotFound(t *testing.T) {
 	}
 }
 
+func TestKubernetesController_GetResources_MissingApiResource(t *testing.T) {
+	router := setupTestRouter()
+	logger := setupTestLogger()
+	mockService := setupMockKubernetesService()
+
+	mockService.GetResourcesFunc = func(apiVersion, kind, namespace, contextName, plural string, limit *int64, continueToken string) (map[string]interface{}, error) {
+		return nil, fmt.Errorf("failed to list resources: the server could not find the requested resource")
+	}
+
+	controller := NewKubernetesController(logger, mockService)
+
+	router.GET("/api/resources", controller.GetResources)
+
+	req, _ := http.NewRequest("GET", "/api/resources?apiVersion=pkg.crossplane.io/v1&kind=Function", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status code %d for missing API resource, got %d", http.StatusOK, w.Code)
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	items, ok := response["items"].([]interface{})
+	if !ok {
+		t.Fatalf("Expected items array in response, got %T", response["items"])
+	}
+
+	if len(items) != 0 {
+		t.Fatalf("Expected empty items array, got %d items", len(items))
+	}
+}
+
 func TestKubernetesController_GetResource_MissingApiVersion(t *testing.T) {
 	router := setupTestRouter()
 	logger := setupTestLogger()
@@ -566,4 +602,3 @@ func TestKubernetesController_GetManagedResources_Error(t *testing.T) {
 		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
 	}
 }
-
