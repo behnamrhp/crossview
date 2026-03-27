@@ -155,7 +155,34 @@
             "host": { "type": "string", "default": "" },
             "port": { "type": "integer", "default": 5432 },
             "database": { "type": "string", "default": "crossview" },
-            "username": { "type": "string", "default": "postgres" }
+            "username": { "type": "string", "default": "postgres" },
+            "ssl": {
+              "type": "object",
+              "description": "PostgreSQL SSL/TLS connection settings",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "disable",
+                  "enum": ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"],
+                  "description": "PostgreSQL SSL connection mode"
+                },
+                "rootCert": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Path to CA certificate file inside the container"
+                },
+                "cert": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Path to client certificate file inside the container"
+                },
+                "key": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Path to client private key file inside the container"
+                }
+              }
+            }
           }
         },
         "server": {
