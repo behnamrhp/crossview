@@ -173,7 +173,7 @@ Crossview can be deployed using Helm, which simplifies Kubernetes deployment and
 ### Add the Helm Repository
 
 ```bash
-helm repo add crossview https://corpobit.github.io/crossview
+helm repo add crossview https://crossplane-contrib.github.io/crossview
 helm repo update
 ```
 
