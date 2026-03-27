@@ -115,6 +115,26 @@ spec:
                 configMapKeyRef:
                   name: {{ include "crossview.configMapName" . }}
                   key: DB_USER
+            - name: DB_SSL_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "crossview.configMapName" . }}
+                  key: DB_SSL_MODE
+            - name: DB_SSL_ROOT_CERT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "crossview.configMapName" . }}
+                  key: DB_SSL_ROOT_CERT
+            - name: DB_SSL_CERT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "crossview.configMapName" . }}
+                  key: DB_SSL_CERT
+            - name: DB_SSL_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "crossview.configMapName" . }}
+                  key: DB_SSL_KEY
             - name: PORT
               valueFrom:
                 configMapKeyRef:

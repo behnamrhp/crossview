@@ -2,6 +2,7 @@ package lib
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -17,14 +18,30 @@ func NewDatabase(env Env, logger Logger) Database {
 		logger.Info("Skipping database connection (auth mode is " + env.AuthMode + ")")
 		return Database{DB: nil}
 	}
-	username := env.DBUsername
-	password := env.DBPassword
-	host := env.DBHost
-	port := env.DBPort
-	dbname := env.DBName
+	sslMode := env.DBSSLMode
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	dsnParts := []string{
+		fmt.Sprintf("host=%s", env.DBHost),
+		fmt.Sprintf("user=%s", env.DBUsername),
+		fmt.Sprintf("password=%s", env.DBPassword),
+		fmt.Sprintf("dbname=%s", env.DBName),
+		fmt.Sprintf("port=%s", env.DBPort),
+		fmt.Sprintf("sslmode=%s", sslMode),
+		"TimeZone=UTC",
+	}
+	if env.DBSSLRootCert != "" {
+		dsnParts = append(dsnParts, fmt.Sprintf("sslrootcert=%s", env.DBSSLRootCert))
+	}
+	if env.DBSSLCert != "" {
+		dsnParts = append(dsnParts, fmt.Sprintf("sslcert=%s", env.DBSSLCert))
+	}
+	if env.DBSSLKey != "" {
+		dsnParts = append(dsnParts, fmt.Sprintf("sslkey=%s", env.DBSSLKey))
+	}
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC", host, username, password, dbname, port)
-
+	dsn := strings.Join(dsnParts, " ")
 	var db *gorm.DB
 	var err error
 	maxRetries := 5
@@ -42,7 +59,7 @@ func NewDatabase(env Env, logger Logger) Database {
 	}
 
 	if err != nil {
-		logger.Info("DSN: ", dsn)
+		logger.Infof("Database connection failed: host=%s port=%s dbname=%s sslmode=%s", env.DBHost, env.DBPort, env.DBName, sslMode)
 		logger.Panic(err)
 	}
 

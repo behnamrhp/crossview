@@ -42,6 +42,12 @@ export const loadConfig = (configPath = null) => {
       database: process.env.DB_NAME || fileConfig.database?.database || 'crossview',
       username: process.env.DB_USER || fileConfig.database?.username || 'postgres',
       password: process.env.DB_PASSWORD || fileConfig.database?.password || 'postgres',
+      ssl: {
+      mode: process.env.DB_SSL_MODE || fileConfig.database?.ssl?.mode || 'disable',
+      rootCert: process.env.DB_SSL_ROOT_CERT || fileConfig.database?.ssl?.rootCert || '',
+      cert: process.env.DB_SSL_CERT || fileConfig.database?.ssl?.cert || '',
+      key: process.env.DB_SSL_KEY || fileConfig.database?.ssl?.key || '',
+    },
     },
     server: {
       port: parseInt(process.env.PORT || process.env.SERVER_PORT || fileConfig.server?.port || '3001', 10),

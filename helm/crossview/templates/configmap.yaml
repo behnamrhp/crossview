@@ -16,6 +16,10 @@ data:
   DB_ENABLED: {{ .Values.config.database.enabled | default false | quote }}
   DB_NAME: {{ .Values.config.database.database | default "crossview" | quote }}
   DB_USER: {{ .Values.config.database.username | default "postgres" | quote }}
+  DB_SSL_MODE: {{ .Values.config.database.ssl.mode | default "disable" | quote }}
+  DB_SSL_ROOT_CERT: {{ .Values.config.database.ssl.rootCert | default "" | quote }}
+  DB_SSL_CERT: {{ .Values.config.database.ssl.cert | default "" | quote }}
+  DB_SSL_KEY: {{ .Values.config.database.ssl.key | default "" | quote }}
   PORT: {{ .Values.config.server.port | default 3001 | quote }}
 {{- $auth := .Values.config.server.auth | default dict }}
 {{- $authHeader := $auth.header | default dict }}

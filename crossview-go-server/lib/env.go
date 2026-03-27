@@ -9,26 +9,32 @@ import (
 )
 
 type Env struct {
+	AdminUserName     string `mapstructure:"ADMIN_USERNAME"`
+	AdminPassword     string `mapstructure:"ADMIN_PASSWORD"`
 	ServerPort        string `mapstructure:"SERVER_PORT"`
 	Environment       string `mapstructure:"ENV"`
 	LogOutput         string `mapstructure:"LOG_OUTPUT"`
 	LogLevel          string `mapstructure:"LOG_LEVEL"`
-	DBUsername        string `mapstructure:"DB_USER"`
-	DBPassword        string `mapstructure:"DB_PASS"`
-	DBHost            string `mapstructure:"DB_HOST"`
-	DBPort            string `mapstructure:"DB_PORT"`
-	DBName            string `mapstructure:"DB_NAME"`
 	SessionSecret     string `mapstructure:"SESSION_SECRET"`
 	CORSOrigin        string `mapstructure:"CORS_ORIGIN"`
 	AuthMode          string `mapstructure:"AUTH_MODE"`
 	AuthTrustedHeader string `mapstructure:"AUTH_TRUSTED_HEADER"`
 	AuthCreateUsers   bool   `mapstructure:"AUTH_CREATE_USERS"`
 	AuthDefaultRole   string `mapstructure:"AUTH_DEFAULT_ROLE"`
-	OIDCEnabled       bool   `mapstructure:"OIDC_ENABLED"`
-	SAMLEnabled       bool   `mapstructure:"SAML_ENABLED"`
-	DBEnabled         bool   `mapstructure:"DB_ENABLED"`
-	AdminUserName     string `mapstructure:"ADMIN_USERNAME"`
-	AdminPassword     string `mapstructure:"ADMIN_PASSWORD"`
+
+	DBUsername    string `mapstructure:"DB_USER"`
+	DBPassword    string `mapstructure:"DB_PASS"`
+	DBHost        string `mapstructure:"DB_HOST"`
+	DBPort        string `mapstructure:"DB_PORT"`
+	DBName        string `mapstructure:"DB_NAME"`
+	DBSSLMode     string `mapstructure:"DB_SSL_MODE"`
+	DBSSLRootCert string `mapstructure:"DB_SSL_ROOT_CERT"`
+	DBSSLCert     string `mapstructure:"DB_SSL_CERT"`
+	DBSSLKey      string `mapstructure:"DB_SSL_KEY"`
+	DBEnabled     bool   `mapstructure:"DB_ENABLED"`
+
+	OIDCEnabled bool `mapstructure:"OIDC_ENABLED"`
+	SAMLEnabled bool `mapstructure:"SAML_ENABLED"`
 }
 
 func NewEnv() Env {
@@ -80,6 +86,29 @@ func NewEnv() Env {
 		getConfigValue("database.port", viper.GetString("DB_PORT"), "5432"))
 	env.DBName = getEnvOrDefault("DB_NAME", getEnvOrDefault("DB_DATABASE",
 		getConfigValue("database.database", viper.GetString("DB_NAME"), "crossview")))
+	env.DBSSLMode = firstNonEmpty(
+		os.Getenv("DB_SSL_MODE"),
+		os.Getenv("DB_SSLMODE"),
+		getConfigValue("database.ssl.mode", viper.GetString("DB_SSL_MODE"), "disable"),
+	)
+
+	env.DBSSLRootCert = firstNonEmpty(
+		os.Getenv("DB_SSL_ROOT_CERT"),
+		os.Getenv("DB_SSLROOTCERT"),
+		getConfigValue("database.ssl.rootCert", viper.GetString("DB_SSL_ROOT_CERT"), ""),
+	)
+
+	env.DBSSLCert = firstNonEmpty(
+		os.Getenv("DB_SSL_CERT"),
+		os.Getenv("DB_SSLCERT"),
+		getConfigValue("database.ssl.cert", viper.GetString("DB_SSL_CERT"), ""),
+	)
+
+	env.DBSSLKey = firstNonEmpty(
+		os.Getenv("DB_SSL_KEY"),
+		os.Getenv("DB_SSLKEY"),
+		getConfigValue("database.ssl.key", viper.GetString("DB_SSL_KEY"), ""),
+	)
 
 	env.SessionSecret = getEnvOrDefault("SESSION_SECRET",
 		getConfigValue("server.session.secret", viper.GetString("SESSION_SECRET"),
