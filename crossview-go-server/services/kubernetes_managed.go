@@ -11,6 +11,138 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+type managedResourceTarget struct {
+	apiVersion string
+	kind       string
+	plural     string
+}
+
+func buildManagedResourceTargetsFromMRDs(mrdList []map[string]interface{}) []managedResourceTarget {
+	resourceTargets := make([]managedResourceTarget, 0, len(mrdList)+6)
+
+	for _, mrd := range mrdList {
+		spec, _ := mrd["spec"].(map[string]interface{})
+		if spec == nil {
+			continue
+		}
+
+		group, _ := spec["group"].(string)
+		if group == "" {
+			continue
+		}
+
+		versions, _ := spec["versions"].([]interface{})
+		var version string
+		if len(versions) > 0 {
+			if v, ok := versions[0].(map[string]interface{}); ok {
+				version, _ = v["name"].(string)
+			}
+		}
+		if version == "" {
+			if v, ok := spec["version"].(string); ok {
+				version = v
+			}
+		}
+		if version == "" {
+			version = "v1"
+		}
+
+		names, _ := spec["names"].(map[string]interface{})
+		plural, _ := names["plural"].(string)
+		kind, _ := names["kind"].(string)
+		if plural == "" || kind == "" {
+			continue
+		}
+
+		resourceTargets = append(resourceTargets, managedResourceTarget{
+			apiVersion: fmt.Sprintf("%s/%s", group, version),
+			kind:       kind,
+			plural:     plural,
+		})
+	}
+
+	return resourceTargets
+}
+
+func appendOptionalManagedResourceTargets(resourceTargets []managedResourceTarget) []managedResourceTarget {
+	return append(resourceTargets,
+		managedResourceTarget{apiVersion: "pkg.crossplane.io/v1", kind: "ManagedResourceDefinition", plural: "managedresourcedefinitions"},
+		managedResourceTarget{apiVersion: "pkg.crossplane.io/v1beta1", kind: "ManagedResourceDefinition", plural: "managedresourcedefinitions"},
+		managedResourceTarget{apiVersion: "pkg.crossplane.io/v1alpha1", kind: "ManagedResourceDefinition", plural: "managedresourcedefinitions"},
+		managedResourceTarget{apiVersion: "pkg.crossplane.io/v1", kind: "ManagedResourceActivationPolicy", plural: "managedresourceactivationpolicies"},
+		managedResourceTarget{apiVersion: "pkg.crossplane.io/v1beta1", kind: "ManagedResourceActivationPolicy", plural: "managedresourceactivationpolicies"},
+		managedResourceTarget{apiVersion: "pkg.crossplane.io/v1alpha1", kind: "ManagedResourceActivationPolicy", plural: "managedresourceactivationpolicies"},
+	)
+}
+
+func dedupeManagedResources(items []interface{}) []interface{} {
+	allResources := make([]interface{}, 0, len(items))
+	seenResourceKeys := make(map[string]struct{})
+
+	for _, item := range items {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		metadata, _ := itemMap["metadata"].(map[string]interface{})
+		uid, _ := metadata["uid"].(string)
+		name, _ := metadata["name"].(string)
+		namespace, _ := metadata["namespace"].(string)
+		apiVersion, _ := itemMap["apiVersion"].(string)
+		kind, _ := itemMap["kind"].(string)
+
+		resourceKey := uid
+		if resourceKey == "" {
+			resourceKey = fmt.Sprintf("%s|%s|%s|%s", apiVersion, kind, namespace, name)
+		}
+
+		if _, exists := seenResourceKeys[resourceKey]; exists {
+			continue
+		}
+
+		seenResourceKeys[resourceKey] = struct{}{}
+		allResources = append(allResources, itemMap)
+	}
+
+	return allResources
+}
+
+func (k *KubernetesService) fetchManagedResourceTarget(contextName string, target managedResourceTarget) ([]interface{}, error) {
+	continueToken := ""
+	allItems := make([]interface{}, 0)
+
+	for {
+		result, err := k.GetResources(target.apiVersion, target.kind, "", contextName, target.plural, nil, continueToken)
+		if err != nil {
+			return nil, err
+		}
+
+		items, _ := result["items"].([]interface{})
+		if items != nil {
+			for _, item := range items {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					itemMapCopy := make(map[string]interface{})
+					for key, val := range itemMap {
+						itemMapCopy[key] = val
+					}
+					itemMapCopy["apiVersion"] = target.apiVersion
+					itemMapCopy["kind"] = target.kind
+					allItems = append(allItems, itemMapCopy)
+				}
+			}
+		}
+
+		nextToken, _ := result["continueToken"].(string)
+		if nextToken == "" {
+			break
+		}
+		continueToken = nextToken
+	}
+
+	return allItems, nil
+}
+
 func (k *KubernetesService) GetManagedResources(contextName string, forceRefresh bool) (map[string]interface{}, error) {
 	if contextName != "" {
 		if err := k.SetContext(contextName); err != nil {
@@ -199,71 +331,22 @@ func (k *KubernetesService) GetManagedResources(contextName string, forceRefresh
 		err   error
 	}
 
-	resourceChan := make(chan resourceResult, len(mrdList))
+	resourceTargets := appendOptionalManagedResourceTargets(buildManagedResourceTargetsFromMRDs(mrdList))
+
+	resourceChan := make(chan resourceResult, len(resourceTargets))
 	var wg sync.WaitGroup
 
-	for _, mrd := range mrdList {
-		spec, _ := mrd["spec"].(map[string]interface{})
-		if spec == nil {
-			continue
-		}
-
-		group, _ := spec["group"].(string)
-		if group == "" {
-			continue
-		}
-
-		versions, _ := spec["versions"].([]interface{})
-		var version string
-		if len(versions) > 0 {
-			if v, ok := versions[0].(map[string]interface{}); ok {
-				version, _ = v["name"].(string)
-			}
-		}
-		if version == "" {
-			if v, ok := spec["version"].(string); ok {
-				version = v
-			}
-		}
-		if version == "" {
-			version = "v1"
-		}
-
-		names, _ := spec["names"].(map[string]interface{})
-		plural, _ := names["plural"].(string)
-		kind, _ := names["kind"].(string)
-		if plural == "" || kind == "" {
-			continue
-		}
-
-		apiVersion := fmt.Sprintf("%s/%s", group, version)
-
+	for _, target := range resourceTargets {
 		wg.Add(1)
-		go func(apiVer, resourceKind, pl string) {
+		go func(target managedResourceTarget) {
 			defer wg.Done()
-			result, err := k.GetResources(apiVer, resourceKind, "", contextName, pl, nil, "")
+			items, err := k.fetchManagedResourceTarget(contextName, target)
 			if err != nil {
 				resourceChan <- resourceResult{items: nil, err: err}
 				return
 			}
-
-			items, _ := result["items"].([]interface{})
-			resultItems := make([]interface{}, 0)
-			if items != nil {
-				for _, item := range items {
-					if itemMap, ok := item.(map[string]interface{}); ok {
-						itemMapCopy := make(map[string]interface{})
-						for key, val := range itemMap {
-							itemMapCopy[key] = val
-						}
-						itemMapCopy["apiVersion"] = apiVer
-						itemMapCopy["kind"] = resourceKind
-						resultItems = append(resultItems, itemMapCopy)
-					}
-				}
-			}
-			resourceChan <- resourceResult{items: resultItems, err: nil}
-		}(apiVersion, kind, plural)
+			resourceChan <- resourceResult{items: items, err: nil}
+		}(target)
 	}
 
 	go func() {
@@ -277,6 +360,7 @@ func (k *KubernetesService) GetManagedResources(contextName string, forceRefresh
 			allResources = append(allResources, result.items...)
 		}
 	}
+	allResources = dedupeManagedResources(allResources)
 
 	// Cache the results
 	result := map[string]interface{}{
@@ -293,4 +377,3 @@ func (k *KubernetesService) GetManagedResources(contextName string, forceRefresh
 
 	return result, nil
 }
-
