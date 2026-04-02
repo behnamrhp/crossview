@@ -176,11 +176,31 @@ jobs:
           sed -i "s/v1\.[0-9]\+\.[0-9]\+/v${{ steps.version.outputs.version }}/g" helm/crossview/README.md || true
           echo "Updated helm/crossview/README.md"
 
+      - name: Generate changelog and release notes
+        run: |
+          npx --yes conventional-changelog-cli@5.0.0 -p angular -i CHANGELOG.md -s
+          if head -1 CHANGELOG.md | grep -q '^## \['; then
+            { echo '# Changelog'; echo ''; cat CHANGELOG.md; } > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+          fi
+          npx --yes conventional-changelog-cli@5.0.0 -p angular -u -o RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "## Release ${{ steps.version.outputs.tag }}" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "No conventional-commit entries since the last tag." >> RELEASE_NOTES.md
+          fi
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: RELEASE_NOTES.md
+          retention-days: 14
+
       - name: Commit version updates
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json helm/crossview/Chart.yaml
+          git add package.json helm/crossview/Chart.yaml CHANGELOG.md
           if git diff --staged --quiet; then
             echo "No version changes to commit"
           else
@@ -321,12 +341,19 @@ jobs:
           echo "version=${{ needs.build-and-release.outputs.version }}" >> $GITHUB_OUTPUT
           echo "tag=${{ needs.build-and-release.outputs.tag }}" >> $GITHUB_OUTPUT
 
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Release ${{ steps.version.outputs.tag }}
-          body_path: CHANGELOG.md
+          body_path: release-notes/RELEASE_NOTES.md
+          files: release-notes/RELEASE_NOTES.md
           draft: false
           prerelease: ${{ needs.build-and-release.outputs.is_prerelease }}
           fail_on_unmatched_files: true

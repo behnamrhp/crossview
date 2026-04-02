@@ -39,8 +39,19 @@ See [Getting Started](GETTING_STARTED.md) and [Configuration](CONFIGURATION.md) 
 
 - One feature or fix per PR when possible.
 - Use a clear title and description; reference any related issues.
+- **Use [Conventional Commits](https://www.conventionalcommits.org/) for PR titles.** CI lints PR titles so release automation can categorize changes. Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+  - Examples: `feat(ui): add graph zoom controls`, `fix(helm): correct default replica count`, `chore: bump eslint`.
+- Prefer the same style for commit messages when you can; squashed merge commits often take the PR title as the message.
 - Update documentation if you change behavior or add options.
 - Rebase on latest `main` if the branch becomes outdated.
+
+### Changelog and releases
+
+`CHANGELOG.md` at the repository root is updated during the release workflow from conventional commit history. You do not need to edit it by hand for normal releases. To preview notes locally (after installing dependencies):
+
+```bash
+npx conventional-changelog-cli -p angular -u -o RELEASE_NOTES.md
+```
 
 ### Reporting Issues
 
