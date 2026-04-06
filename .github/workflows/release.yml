@@ -1,47 +1,36 @@
 name: Build and Release
 
 on:
-  push:
-    branches:
-      - main
-      - pre-release
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - 'public/images/**'
-      - 'LICENSE'
-      - 'helm/**'
-      - '.github/workflows/helm-release.yml'
-      - '.github/workflows/security-scan.yml'
-      - '.github/workflows/release.yml'
-  workflow_dispatch:
-    inputs:
+  workflow_dispatch: 
+    inputs: 
+      version:
+        description: 'Version to release (e.g. v3.9.0)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to release from'
+        required: true
+        default: 'main'
+        type: choice
+        options:
+          - main
+          - pre-release
       update_github_pages:
         description: 'Update GitHub Pages Helm repository'
+        required: false
+        default: false
+        type: boolean 
+      publish_helm:
+        description: 'Also publish Helm chart for this version'
         required: false
         default: false
         type: boolean
 
 jobs:
-  check-version-bump:
-    runs-on: ubuntu-latest
-    outputs:
-      is_version_bump: ${{ steps.check.outputs.is_version_bump }}
-    steps:
-      - name: Check if this is a version bump commit
-        id: check
-        run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          if [[ -n "$COMMIT_MSG" ]] && [[ "$COMMIT_MSG" =~ ^[Bb]ump\ version ]]; then
-            echo "is_version_bump=true" >> $GITHUB_OUTPUT
-            echo "Skipping release - this is a version bump commit"
-          else
-            echo "is_version_bump=false" >> $GITHUB_OUTPUT
-          fi
+
 
   build-and-release:
-    needs: check-version-bump
-    if: needs.check-version-bump.outputs.is_version_bump != 'true'
+    environment: production
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -96,7 +85,7 @@ jobs:
         id: version
         run: |
           git fetch --tags --force
-          BRANCH="${GITHUB_REF##*/}"
+          BRANCH="${{ github.event.inputs.branch }}"
 
           LATEST_STABLE=$(git tag --list "v*" | grep -v "-" | sort -V | tail -n1)
           echo "Latest stable tag: $LATEST_STABLE"
@@ -213,8 +202,7 @@ jobs:
           fi
 
   build-docker-images:
-    needs: [check-version-bump, build-and-release]
-    if: needs.check-version-bump.outputs.is_version_bump != 'true'
+    needs: build-and-release
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -277,8 +265,7 @@ jobs:
           outputs: type=image,push=true
 
   create-multi-arch-manifest:
-    needs: [check-version-bump, build-and-release, build-docker-images]
-    if: needs.check-version-bump.outputs.is_version_bump != 'true'
+    needs: [build-and-release, build-docker-images]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -323,8 +310,7 @@ jobs:
           echo "Multi-arch manifest created for Docker Hub: ${{ steps.version.outputs.tag }}"
 
   create-release:
-    needs: [check-version-bump, build-and-release, create-multi-arch-manifest]
-    if: needs.check-version-bump.outputs.is_version_bump != 'true'
+    needs: [build-and-release, create-multi-arch-manifest]
     runs-on: ubuntu-latest
     permissions:
       contents: write
