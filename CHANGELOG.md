@@ -1,3 +1,9 @@
+# [3.9.0-rc.1](https://github.com/crossplane-contrib/crossview/compare/v3.8.0...v3.9.0-rc.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* **ci:** enforce semantic versioning validation in release workflows ([ec011e5](https://github.com/crossplane-contrib/crossview/commit/ec011e52bb877a5e138daa0be6d52f0702890048))
 # Changelog
 
 # v3.8.0 (April 2026)
