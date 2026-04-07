@@ -1,3 +1,14 @@
+# [3.9.0-rc.2](https://github.com/crossplane-contrib/crossview/compare/v3.9.0-rc.1...v3.9.0-rc.2) (2026-04-07)
+
+
+### Bug Fixes
+
+* **ci:** enforce semantic versioning validation in release workflows ([ec011e5](https://github.com/crossplane-contrib/crossview/commit/ec011e52bb877a5e138daa0be6d52f0702890048))
+
+
+### Features
+
+* **ui:** add version display and update indicator to sidebar footer ([61408a8](https://github.com/crossplane-contrib/crossview/commit/61408a82e6c3fccc55c8c220f6825106db6f6233))
 # [3.9.0-rc.1](https://github.com/crossplane-contrib/crossview/compare/v3.8.0...v3.9.0-rc.1) (2026-04-07)
 
 
