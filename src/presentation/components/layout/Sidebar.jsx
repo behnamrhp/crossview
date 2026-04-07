@@ -11,8 +11,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '../../providers/AppProvider.jsx';
 import { colors, getBorderColor, getTextColor, getBackgroundColor, getSidebarColor, getAccentColor } from '../../utils/theme.js';
+import appPackageJson from '../../../../package.json';
+import { useVersionCheck } from '../../hooks/useVersionCheck.js';
+import { FiArrowUp } from 'react-icons/fi';
 
 export const Sidebar = ({ onToggle, onResize }) => {
+  const appVersion = appPackageJson.version;
+  const updateInfo = useVersionCheck(appVersion);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [width, setWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
@@ -507,46 +512,118 @@ export const Sidebar = ({ onToggle, onResize }) => {
         >
           {!isCollapsed && (
             <VStack spacing={3} align="stretch">
-              <Text
-                fontSize="xs"
-                color={getTextColor(colorMode, 'tertiary')}
-                _dark={{ color: getTextColor('dark', 'tertiary') }}
-                lineHeight="1.5"
-                textAlign="center"
-              >
-                Open-source project maintained by{' '}
-                <Text as="span" fontWeight="semibold" color={getTextColor(colorMode, 'primary')} _dark={{ color: getTextColor('dark', 'primary') }}>
-                  Crossplane Contributors
-                </Text>
-                </Text>
               <Box
-                as="a"
-                href="https://github.com/corpobit/crossview"
-                target="_blank"
-                rel="noopener noreferrer"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                w="100%"
-                px={3}
-                py={2}
-                borderRadius="md"
-                bg="transparent"
-                _hover={{ bg: getBackgroundColor(colorMode, 'secondary'), _dark: { bg: getBackgroundColor('dark', 'tertiary') } }}
-                transition="all 0.2s"
-                textDecoration="none"
-                color={getTextColor(colorMode, 'primary')}
-                _dark={{ color: getTextColor('dark', 'primary') }}
+                p={3}
+                borderRadius="lg"
+                bg={getBackgroundColor(colorMode, 'secondary')}
+                border="1px solid"
+                borderColor={getBorderColor(colorMode)}
+                _dark={{
+                  bg: getBackgroundColor('dark', 'secondary'),
+                  borderColor: getBorderColor('dark')
+                }}
               >
-                <HStack spacing={2}>
-                  <FiGithub size={18} style={{ color: 'inherit' }} />
-                  <Text
-                    fontSize="sm"
-                    fontWeight="medium"
+                <HStack justify="space-between" align="center" mb={1}>
+                  <HStack spacing={2}>
+                    <Box
+                      as="a"
+                      href="https://github.com/corpobit/crossview"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      w="22px"
+                      h="22px"
+                      borderRadius="md"
+                      color={getTextColor(colorMode, 'primary')}
+                      _dark={{ color: getTextColor('dark', 'primary') }}
+                      _hover={{ bg: getBackgroundColor(colorMode, 'tertiary'), _dark: { bg: getBackgroundColor('dark', 'tertiary') } }}
+                      transition="all 0.2s"
+                      aria-label="Open Crossview GitHub repository"
+                      title="Crossview on GitHub"
+                    >
+                      <FiGithub size={14} style={{ color: 'inherit' }} />
+                    </Box>
+                    <Text
+                      fontSize="xs"
+                      fontWeight="semibold"
+                      color={getTextColor(colorMode, 'primary')}
+                      _dark={{ color: getTextColor('dark', 'primary') }}
+                      letterSpacing="0.03em"
+                    >
+                      CROSSVIEW
+                    </Text>
+                  </HStack>
+                  <Box
+                    px={2}
+                    py={0.5}
+                    borderRadius="full"
+                    bg={getSidebarColor(colorMode, 'activeBg')}
+                    _dark={{ bg: getSidebarColor('dark', 'activeBg') }}
                   >
-                    GitHub
-                  </Text>
+                    <Text
+                      fontSize="xs"
+                      fontWeight="semibold"
+                      color={getTextColor(colorMode, 'secondary')}
+                      _dark={{ color: getTextColor('dark', 'secondary') }}
+                    >
+                      v{appVersion}
+                    </Text>
+                  </Box>
                 </HStack>
+                <Text
+                  fontSize="xs"
+                  color={getTextColor(colorMode, 'secondary')}
+                  _dark={{ color: getTextColor('dark', 'secondary') }}
+                >
+                  Control plane visibility for Crossplane resources.
+                </Text>
+                <Text
+                  fontSize="xs"
+                  color={getTextColor(colorMode, 'tertiary')}
+                  _dark={{ color: getTextColor('dark', 'tertiary') }}
+                  mt={2}
+                >
+                  Maintained by Crossplane Contributors
+                </Text>
+                {updateInfo && (
+                  <Box
+                    as="a"
+                    href={updateInfo.releaseUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    mt={3}
+                    p={2}
+                    borderRadius="md"
+                    bg={updateInfo.isPrerelease ? 'purple.50' : 'green.50'}
+                    border="1px solid"
+                    borderColor={updateInfo.isPrerelease ? 'purple.200' : 'green.200'}
+                    _dark={{
+                      bg: updateInfo.isPrerelease ? 'rgba(168,85,247,0.15)' : 'rgba(16,185,129,0.15)',
+                      borderColor: updateInfo.isPrerelease ? 'purple.700' : 'green.700',
+                    }}
+                    display="flex"
+                    alignItems="center"
+                    gap={2}
+                    textDecoration="none"
+                    transition="opacity 0.2s"
+                    _hover={{ opacity: 0.8 }}
+                  >
+                    <FiArrowUp
+                      size={12}
+                      style={{ color: updateInfo.isPrerelease ? '#9333ea' : '#10b981', flexShrink: 0 }}
+                    />
+                    <Text
+                      fontSize="xs"
+                      fontWeight="medium"
+                      color={updateInfo.isPrerelease ? 'purple.700' : 'green.700'}
+                      _dark={{ color: updateInfo.isPrerelease ? 'purple.300' : 'green.300' }}
+                    >
+                      {updateInfo.isPrerelease ? 'RC' : 'Update'} v{updateInfo.latestVersion} available
+                    </Text>
+                  </Box>
+                )}
               </Box>
             </VStack>
           )}
