@@ -38,7 +38,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                   </Text>
                 </Box>
               )}
-              {(fullResource.metadata?.namespace || fullResource.namespace || resource.namespace) && (
+              {(fullResource.metadata?.namespace || fullResource.namespace || resource.namespace) && (fullResource.metadata?.namespace || fullResource.namespace || resource.namespace) !== 'default' && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -163,7 +163,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
               <Text fontSize="md" fontWeight="bold" color="gray.800" _dark={{ color: 'gray.100' }}>Claim Details</Text>
             </HStack>
             <VStack align="stretch" spacing={3}>
-              {fullResource.spec?.resourceRef && (
+              {(fullResource.spec?.resourceRef || fullResource.spec?.crossplane?.resourceRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -174,11 +174,14 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Composite Resource
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }} fontFamily="mono">
-                    {fullResource.spec.resourceRef.kind}/{fullResource.spec.resourceRef.name}
+                    {(() => {
+                      const ref = fullResource.spec?.resourceRef || fullResource.spec?.crossplane?.resourceRef;
+                      return `${ref.kind}/${ref.name}`;
+                    })()}
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.compositionRef && (
+              {(fullResource.spec?.compositionRef || fullResource.spec?.crossplane?.compositionRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -189,11 +192,11 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Composition
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.compositionRef.name}
+                    {(fullResource.spec?.compositionRef || fullResource.spec?.crossplane?.compositionRef).name}
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.compositionRevisionRef && (
+              {(fullResource.spec?.compositionRevisionRef || fullResource.spec?.crossplane?.compositionRevisionRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -204,11 +207,11 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Composition Revision
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }} fontFamily="mono">
-                    {fullResource.spec.compositionRevisionRef.name}
+                    {(fullResource.spec?.compositionRevisionRef || fullResource.spec?.crossplane?.compositionRevisionRef).name}
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.compositeDeletePolicy && (
+              {(fullResource.spec?.compositeDeletePolicy || fullResource.spec?.crossplane?.compositeDeletePolicy) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -219,7 +222,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Composite Delete Policy
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.compositeDeletePolicy}
+                    {fullResource.spec?.compositeDeletePolicy || fullResource.spec?.crossplane?.compositeDeletePolicy}
                   </Text>
                 </Box>
               )}
@@ -234,7 +237,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Replicas
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.replicas}
+                    {fullResource.spec?.replicas || fullResource.spec?.crossplane?.replicas}
                   </Text>
                 </Box>
               )}
@@ -243,7 +246,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
         )}
 
         {/* Properties section for Composite Resources */}
-        {(fullResource.kind === 'XNginx' || (fullResource.kind && fullResource.kind.startsWith('X'))) && fullResource.spec && (
+        {((fullResource.kind && fullResource.kind.startsWith('X')) || fullResource.spec?.resourceRefs?.length > 0 || fullResource.spec?.crossplane?.resourceRefs?.length > 0) && (
           <Box p={5}>
             <HStack spacing={2} mb={4}>
               <Box color="orange.500" _dark={{ color: 'orange.400' }}>
@@ -252,7 +255,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
               <Text fontSize="md" fontWeight="bold" color="gray.800" _dark={{ color: 'gray.100' }}>Composite Resource Details</Text>
             </HStack>
             <VStack align="stretch" spacing={3}>
-              {fullResource.spec?.claimRef && (
+              {(fullResource.spec?.claimRef || fullResource.spec?.crossplane?.claimRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -263,11 +266,14 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Claim
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }} fontFamily="mono">
-                    {fullResource.spec.claimRef.namespace}/{fullResource.spec.claimRef.kind}/{fullResource.spec.claimRef.name}
+                    {(() => {
+                      const claimRef = fullResource.spec?.crossplane?.claimRef || fullResource.spec?.claimRef;
+                      return `${claimRef.namespace ? `${claimRef.namespace}/` : ''}${claimRef.kind ? `${claimRef.kind}/` : ''}${claimRef.name}`;
+                    })()}
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.compositionRef && (
+              {(fullResource.spec?.compositionRef || fullResource.spec?.crossplane?.compositionRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -278,11 +284,14 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Composition
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.compositionRef.name}
+                    {(() => {
+                      const compositionRef = fullResource.spec?.crossplane?.compositionRef || fullResource.spec?.compositionRef;
+                      return compositionRef.name || compositionRef;
+                    })()}
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.compositionRevisionRef && (
+              {(fullResource.spec?.compositionRevisionRef || fullResource.spec?.crossplane?.compositionRevisionRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -293,11 +302,14 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Composition Revision
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }} fontFamily="mono">
-                    {fullResource.spec.compositionRevisionRef.name}
+                    {(() => {
+                      const compositionRevisionRef = fullResource.spec?.crossplane?.compositionRevisionRef || fullResource.spec?.compositionRevisionRef;
+                      return compositionRevisionRef.name || compositionRevisionRef;
+                    })()}
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.compositionUpdatePolicy && (
+              {(fullResource.spec?.compositionUpdatePolicy || fullResource.spec?.crossplane?.compositionUpdatePolicy) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -308,11 +320,11 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Composition Update Policy
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.compositionUpdatePolicy}
+                    {fullResource.spec?.crossplane?.compositionUpdatePolicy || fullResource.spec?.compositionUpdatePolicy}
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.resourceRefs && fullResource.spec.resourceRefs.length > 0 && (
+              {(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).length > 0 && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -320,14 +332,14 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                   borderRadius="md"
                 >
                   <Text fontSize="xs" fontWeight="semibold" color="gray.500" _dark={{ color: 'gray.400' }} mb={2}>
-                    Managed Resources ({fullResource.spec.resourceRefs.length})
+                    Managed Resources ({(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).length})
                   </Text>
                   <VStack align="stretch" spacing={2}>
-                    {fullResource.spec.resourceRefs.map((ref, idx) => (
+                    {(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).map((ref, idx) => (
                       <Box key={idx} pl={2} borderLeft="2px solid" borderColor="blue.300" _dark={{ borderColor: 'blue.600' }}>
                         <Text fontSize="xs" color="gray.600" _dark={{ color: 'gray.400' }} fontFamily="mono">
                           {ref.kind}/{ref.name}
-                          {ref.namespace && ` (${ref.namespace})`}
+                          {ref.namespace && ref.namespace !== 'default' && ` (${ref.namespace})`}
                         </Text>
                       </Box>
                     ))}
@@ -345,7 +357,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Replicas
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.replicas}
+                    {fullResource.spec?.replicas || fullResource.spec?.crossplane?.replicas}
                   </Text>
                 </Box>
               )}
@@ -363,7 +375,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
               <Text fontSize="md" fontWeight="bold" color="gray.800" _dark={{ color: 'gray.100' }}>Provider Details</Text>
             </HStack>
             <VStack align="stretch" spacing={3}>
-              {fullResource.spec?.package && (
+              {(fullResource.spec?.package || fullResource.spec?.crossplane?.package) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -374,7 +386,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Package
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }} fontFamily="mono">
-                    {fullResource.spec.package}
+                    {fullResource.spec?.package || fullResource.spec?.crossplane?.package}
                   </Text>
                 </Box>
               )}
@@ -423,7 +435,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.controllerConfigRef && (
+              {(fullResource.spec?.controllerConfigRef || fullResource.spec?.crossplane?.controllerConfigRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -434,7 +446,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Controller Config Reference
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.controllerConfigRef.name || fullResource.spec.controllerConfigRef}
+                    {(fullResource.spec?.controllerConfigRef || fullResource.spec?.crossplane?.controllerConfigRef).name || (fullResource.spec?.controllerConfigRef || fullResource.spec?.crossplane?.controllerConfigRef)}
                   </Text>
                 </Box>
               )}
@@ -497,7 +509,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
               <Text fontSize="md" fontWeight="bold" color="gray.800" _dark={{ color: 'gray.100' }}>Function Details</Text>
             </HStack>
             <VStack align="stretch" spacing={3}>
-              {fullResource.spec?.package && (
+              {(fullResource.spec?.package || fullResource.spec?.crossplane?.package) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -508,7 +520,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Package
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }} fontFamily="mono">
-                    {fullResource.spec.package}
+                    {fullResource.spec?.package || fullResource.spec?.crossplane?.package}
                   </Text>
                 </Box>
               )}
@@ -557,7 +569,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                   </Text>
                 </Box>
               )}
-              {fullResource.spec?.controllerConfigRef && (
+              {(fullResource.spec?.controllerConfigRef || fullResource.spec?.crossplane?.controllerConfigRef) && (
                 <Box
                   p={3}
                   bg="gray.50"
@@ -568,7 +580,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                     Controller Config Reference
                   </Text>
                   <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                    {fullResource.spec.controllerConfigRef.name || fullResource.spec.controllerConfigRef}
+                    {(fullResource.spec?.controllerConfigRef || fullResource.spec?.crossplane?.controllerConfigRef).name || (fullResource.spec?.controllerConfigRef || fullResource.spec?.crossplane?.controllerConfigRef)}
                   </Text>
                 </Box>
               )}
@@ -837,11 +849,11 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
 
         {(() => {
           const hasConfig = fullResource.spec && (
-            fullResource.spec.compositionRef ||
-            fullResource.spec.claimRef ||
-            fullResource.spec.resourceRef ||
-            fullResource.spec.writeConnectionSecretToRef ||
-            (fullResource.spec.resourceRefs && fullResource.spec.resourceRefs.length > 0)
+            (fullResource.spec.compositionRef || fullResource.spec?.crossplane?.compositionRef) ||
+            (fullResource.spec.claimRef || fullResource.spec?.crossplane?.claimRef) ||
+            (fullResource.spec.resourceRef || fullResource.spec?.crossplane?.resourceRef) ||
+            (fullResource.spec.writeConnectionSecretToRef || fullResource.spec?.crossplane?.writeConnectionSecretToRef) ||
+            ((fullResource.spec.resourceRefs || fullResource.spec?.crossplane?.resourceRefs) && (fullResource.spec.resourceRefs || fullResource.spec?.crossplane?.resourceRefs).length > 0)
           );
           
           return hasConfig ? (
@@ -854,7 +866,7 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
               </HStack>
               <Box>
                 <VStack align="stretch" spacing={3}>
-                  {fullResource.spec.compositionRef && (
+                  {(fullResource.spec?.compositionRef || fullResource.spec?.crossplane?.compositionRef) && (
                     <Box
                       p={3}
                       bg="gray.50"
@@ -864,10 +876,10 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                       <Text fontSize="xs" fontWeight="semibold" color="gray.500" _dark={{ color: 'gray.400' }} mb={1}>
                         Composition Reference
                       </Text>
-                      <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>{fullResource.spec.compositionRef.name}</Text>
+                      <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>{(fullResource.spec?.compositionRef || fullResource.spec?.crossplane?.compositionRef).name}</Text>
                     </Box>
                   )}
-                  {fullResource.spec.claimRef && (
+                  {(fullResource.spec?.claimRef || fullResource.spec?.crossplane?.claimRef) && (
                     <Box
                       p={3}
                       bg="gray.50"
@@ -878,11 +890,11 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                         Claim Reference
                       </Text>
                       <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                        {fullResource.spec.claimRef.namespace}/{fullResource.spec.claimRef.name}
+                        {(fullResource.spec?.claimRef || fullResource.spec?.crossplane?.claimRef).namespace}/{(fullResource.spec?.claimRef || fullResource.spec?.crossplane?.claimRef).name}
                       </Text>
                     </Box>
                   )}
-                  {fullResource.spec.resourceRef && (
+                  {(fullResource.spec?.resourceRef || fullResource.spec?.crossplane?.resourceRef) && (
                     <Box
                       p={3}
                       bg="gray.50"
@@ -893,11 +905,11 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                         Resource Reference
                       </Text>
                       <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                        {fullResource.spec.resourceRef.kind}/{fullResource.spec.resourceRef.name}
+                        {(fullResource.spec?.resourceRef || fullResource.spec?.crossplane?.resourceRef).kind}/{(fullResource.spec?.resourceRef || fullResource.spec?.crossplane?.resourceRef).name}
                       </Text>
                     </Box>
                   )}
-                  {fullResource.spec.writeConnectionSecretToRef && (
+                  {(fullResource.spec?.writeConnectionSecretToRef || fullResource.spec?.crossplane?.writeConnectionSecretToRef) && (
                     <Box
                       p={3}
                       bg="gray.50"
@@ -908,14 +920,14 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                         Connection Secret
                       </Text>
                       <Text fontSize="sm" color="gray.900" _dark={{ color: 'gray.100' }}>
-                        {fullResource.spec.writeConnectionSecretToRef.namespace || 'default'}/{fullResource.spec.writeConnectionSecretToRef.name}
+                        {(fullResource.spec?.writeConnectionSecretToRef || fullResource.spec?.crossplane?.writeConnectionSecretToRef).namespace || 'default'}/{(fullResource.spec?.writeConnectionSecretToRef || fullResource.spec?.crossplane?.writeConnectionSecretToRef).name}
                       </Text>
                     </Box>
                   )}
-                  {fullResource.spec.resourceRefs && fullResource.spec.resourceRefs.length > 0 && (
+                  {(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).length > 0 && (
                     <Box>
                       <Text fontSize="xs" fontWeight="semibold" color="gray.500" _dark={{ color: 'gray.400' }} mb={2}>
-                        Managed Resources ({fullResource.spec.resourceRefs.length})
+                        Managed Resources ({(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).length})
                       </Text>
                       <Box
                         p={3}
@@ -924,14 +936,17 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                         borderRadius="md"
                       >
                         <VStack align="stretch" spacing={2}>
-                          {fullResource.spec.resourceRefs.slice(0, 5).map((ref, idx) => (
-                            <Text key={idx} fontSize="xs" fontFamily="mono" color="gray.700" _dark={{ color: 'gray.300' }}>
-                              {ref.kind}/{ref.name}
-                            </Text>
+                          {(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).slice(0, 5).map((ref, idx) => (
+                            <Box key={idx}>
+                              <Text fontSize="xs" fontFamily="mono" color="gray.700" _dark={{ color: 'gray.300' }}>
+                                {ref.kind}/{ref.name}
+                                {ref.namespace && ref.namespace !== 'default' && ` (${ref.namespace})`}
+                              </Text>
+                            </Box>
                           ))}
-                          {fullResource.spec.resourceRefs.length > 5 && (
+                          {(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).length > 5 && (
                             <Text fontSize="xs" color="gray.500" _dark={{ color: 'gray.500' }}>
-                              +{fullResource.spec.resourceRefs.length - 5} more
+                              +{(fullResource.spec?.resourceRefs || fullResource.spec?.crossplane?.resourceRefs || []).length - 5} more
                             </Text>
                           )}
                         </VStack>
@@ -989,7 +1004,6 @@ export const ResourceOverview = ({ fullResource, resource, relatedResources, onR
                       </HStack>
                       <Text fontSize="xs" color="gray.600" _dark={{ color: 'gray.400' }}>
                         {related.name}
-                        {related.namespace && ` • ${related.namespace}`}
                       </Text>
                     </VStack>
                     <FiExternalLink style={{ color: 'var(--chakra-colors-gray-400)' }} />
