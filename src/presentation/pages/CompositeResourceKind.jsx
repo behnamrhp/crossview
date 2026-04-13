@@ -1,10 +1,9 @@
 import {
   Box,
   Text,
-  HStack,
 } from '@chakra-ui/react';
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../providers/AppProvider.jsx';
 import { DataTable } from '../components/common/DataTable.jsx';
 import { ResourceDetails } from '../components/common/ResourceDetails.jsx';
@@ -15,9 +14,19 @@ import { GetCompositionsUseCase } from '../../domain/usecases/GetCompositionsUse
 import { GetCompositeResourceDefinitionsUseCase } from '../../domain/usecases/GetCompositeResourceDefinitionsUseCase.js';
 import { getSyncedStatus, getReadyStatus, getResponsiveStatus } from '../utils/resourceStatus.js';
 
+const normalizeResource = (resource, fallbackKind) => ({
+  apiVersion: resource.apiVersion || 'apiextensions.crossplane.io/v1',
+  kind: resource.kind || fallbackKind,
+  name: resource.name,
+  namespace: resource.namespace || null,
+  plural: resource.plural || null,
+});
+
 export const CompositeResourceKind = () => {
   const { kind } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { kubernetesRepository, selectedContext } = useAppContext();
   const [resources, setResources] = useState([]);
   const [filteredResources, setFilteredResources] = useState([]);
@@ -30,6 +39,27 @@ export const CompositeResourceKind = () => {
   const [responsiveFilter, setResponsiveFilter] = useState('all');
   const [useAutoHeight, setUseAutoHeight] = useState(false);
   const tableContainerRef = useRef(null);
+  const selectedName = searchParams.get('name') || '';
+  const selectedNamespace = searchParams.get('namespace') || '';
+
+  const buildResourceSearchParams = (resource) => {
+    const nextSearchParams = new URLSearchParams();
+    if (resource?.name) {
+      nextSearchParams.set('name', resource.name);
+    }
+    if (resource?.namespace && resource.namespace !== 'undefined') {
+      nextSearchParams.set('namespace', resource.namespace);
+    }
+    return nextSearchParams;
+  };
+
+  const updateResourceSearchParams = (resource) => {
+    setSearchParams(buildResourceSearchParams(resource));
+  };
+
+  const clearResourceSearchParams = () => {
+    setSearchParams(new URLSearchParams());
+  };
 
   // Close resource detail when route changes
   useEffect(() => {
@@ -110,6 +140,35 @@ export const CompositeResourceKind = () => {
     
     setFilteredResources(filtered);
   }, [resources, syncedFilter, readyFilter, responsiveFilter, kind]);
+
+  useEffect(() => {
+    if (!selectedName) {
+      setSelectedResource(null);
+      setNavigationHistory([]);
+      return;
+    }
+
+    const matchingResource = resources.find((resource) => {
+      if (!resource || resource.kind !== kind || resource.name !== selectedName) {
+        return false;
+      }
+
+      if (selectedNamespace) {
+        return (resource.namespace || '') === selectedNamespace;
+      }
+
+      return true;
+    });
+
+    if (!matchingResource) {
+      setSelectedResource(null);
+      setNavigationHistory([]);
+      return;
+    }
+
+    setNavigationHistory([]);
+    setSelectedResource(normalizeResource(matchingResource, kind));
+  }, [resources, kind, selectedName, selectedNamespace]);
 
   useEffect(() => {
     if (!selectedResource || !tableContainerRef.current) {
@@ -338,31 +397,44 @@ export const CompositeResourceKind = () => {
   }
 
   const handleRowClick = (item) => {
-    const clickedResource = {
-      apiVersion: item.apiVersion || 'apiextensions.crossplane.io/v1',
-      kind: item.kind || kind,
-      name: item.name,
-      namespace: item.namespace || null,
-    };
+    const clickedResource = normalizeResource(item, kind);
 
     if (selectedResource && 
         selectedResource.name === clickedResource.name &&
         selectedResource.kind === clickedResource.kind &&
         selectedResource.apiVersion === clickedResource.apiVersion &&
-        selectedResource.namespace === clickedResource.namespace) {
+        selectedResource.namespace === clickedResource.namespace &&
+        selectedResource.plural === clickedResource.plural) {
       setSelectedResource(null);
       setNavigationHistory([]);
+      clearResourceSearchParams();
       return;
     }
 
     // Clear navigation history when opening from table (not from another resource)
     setNavigationHistory([]);
     setSelectedResource(clickedResource);
+    updateResourceSearchParams(clickedResource);
   };
 
   const handleNavigate = (resource) => {
+    const normalizedResource = normalizeResource(resource, kind);
+
+    if (normalizedResource.kind !== kind && normalizedResource.kind?.startsWith('X')) {
+      const nextSearchParams = buildResourceSearchParams(normalizedResource);
+      navigate({
+        pathname: `/composite-resources/${normalizedResource.kind}`,
+        search: `?${nextSearchParams.toString()}`,
+      });
+      return;
+    }
+
     setNavigationHistory(prev => [...prev, selectedResource]);
-    setSelectedResource(resource);
+    setSelectedResource(normalizedResource);
+
+    if (normalizedResource.kind === kind) {
+      updateResourceSearchParams(normalizedResource);
+    }
   };
 
   const handleBack = () => {
@@ -370,14 +442,20 @@ export const CompositeResourceKind = () => {
       const previous = navigationHistory[navigationHistory.length - 1];
       setNavigationHistory(prev => prev.slice(0, -1));
       setSelectedResource(previous);
+
+      if (previous) {
+        updateResourceSearchParams(previous);
+      }
     } else {
       setSelectedResource(null);
+      clearResourceSearchParams();
     }
   };
 
   const handleClose = () => {
     setSelectedResource(null);
     setNavigationHistory([]);
+    clearResourceSearchParams();
   };
 
   return (
@@ -478,4 +556,3 @@ export const CompositeResourceKind = () => {
     </Box>
   );
 };
-

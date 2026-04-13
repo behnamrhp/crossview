@@ -59,8 +59,8 @@ export const useResourceData = (resource) => {
         resourceRef: full.spec.resourceRef || original.resourceRef || original.spec?.resourceRef,
         compositionRef: full.spec.compositionRef || original.compositionRef || original.spec?.compositionRef,
         writeConnectionSecretToRef: full.spec.writeConnectionSecretToRef || original.writeConnectionSecretToRef || original.spec?.writeConnectionSecretToRef,
-        resourceRefs: full.spec.resourceRefs || original.resourceRefs || original.spec?.resourceRefs || [],
-        claimRef: full.spec.claimRef || original.claimRef || original.spec?.claimRef,
+        resourceRefs: full.spec.resourceRefs || full.spec?.crossplane?.resourceRefs || original.spec?.resourceRefs || original?.spec?.crossplane?.resourceRefs || [],
+        claimRef: full.spec.claimRef || full.spec?.crossplane?.claimRef || original.claimRef || original.spec?.claimRef || original?.spec?.crossplane?.claimRef,
         writeConnectionSecretsTo: full.spec.writeConnectionSecretsTo || original.writeConnectionSecretsTo || original.spec?.writeConnectionSecretsTo,
       };
     }
@@ -99,13 +99,16 @@ export const useResourceData = (resource) => {
     const resourceRef = full.spec?.resourceRef || full.resourceRef || original?.resourceRef || original?.spec?.resourceRef;
     if (resourceRef) add('Composite Resource', resourceRef);
 
-    const compositionRef = full.spec?.compositionRef || full.compositionRef || original?.compositionRef || original?.spec?.compositionRef;
+    const compositionRef = full.spec?.compositionRef || full.spec?.crossplane?.compositionRef || full.compositionRef || original?.compositionRef || original?.spec?.compositionRef || original?.spec?.crossplane?.compositionRef;
     if (compositionRef) {
       const name = typeof compositionRef === 'string' ? compositionRef : compositionRef.name || compositionRef;
       add('Composition', { name, apiVersion: 'apiextensions.crossplane.io/v1', kind: 'Composition' });
     }
 
-    if (full.spec?.claimRef) add('Claim', full.spec.claimRef, full.spec.claimRef.namespace);
+    const claimRef = full.spec?.claimRef || full.spec?.crossplane?.claimRef || full.claimRef || original?.claimRef || original?.spec?.claimRef || original?.spec?.crossplane?.claimRef;
+    if (claimRef) {
+      add('Claim', claimRef, claimRef.namespace);
+    }
 
     if (full.spec?.writeConnectionSecretToRef) {
       add('Secret', full.spec.writeConnectionSecretToRef, full.spec.writeConnectionSecretToRef.namespace || original?.namespace);
@@ -115,10 +118,11 @@ export const useResourceData = (resource) => {
       full.spec.writeConnectionSecretsTo.forEach(r => add('Secret', r, r.namespace || original?.namespace));
     }
 
-    const parentNs = full.spec?.claimRef?.namespace || full.metadata?.namespace || original?.namespace || null;
+    const parentNs = full.spec?.claimRef?.namespace || full.spec?.crossplane?.claimRef?.namespace || full.metadata?.namespace || original?.namespace || null;
 
-    if (full.spec?.resourceRefs?.length) {
-      full.spec.resourceRefs.forEach(ref => {
+    const resourceRefs = full.spec?.resourceRefs || full.spec?.crossplane?.resourceRefs;
+    if (resourceRefs?.length) {
+      resourceRefs.forEach(ref => {
         let ns = ref.namespace || (['Deployment','Service','Pod','ConfigMap','Secret','ReplicaSet','StatefulSet','DaemonSet'].includes(ref.kind) ? parentNs : null);
         add('Managed Resource', ref, ns);
       });
@@ -134,7 +138,7 @@ export const useResourceData = (resource) => {
     const labels = full.metadata?.labels || {};
     if (labels['crossplane.io/composite']) {
       const name = labels['crossplane.io/composite'];
-      const owner = full.metadata?.ownerReferences?.find(r => r.kind?.startsWith('X') && r.name === name);
+      const owner = full.metadata?.ownerReferences?.find(r => r.name === name);
       related.push({
         type: 'Composite Resource (Owner)',
         apiVersion: owner?.apiVersion || 'unknown',
@@ -214,9 +218,10 @@ export const useResourceData = (resource) => {
       allEvents.push(...compEvents);
     }
 
-    if (full.spec?.resourceRefs?.length) {
-      const parentNs = full.spec?.claimRef?.namespace || full.metadata?.namespace || original?.namespace || 'default';
-      for (const ref of full.spec.resourceRefs) {
+    const resourceRefs = full.spec?.resourceRefs || full.spec?.crossplane?.resourceRefs;
+    if (resourceRefs?.length) {
+      const parentNs = full.spec?.claimRef?.namespace || full.spec?.crossplane?.claimRef?.namespace || full.metadata?.namespace || original?.namespace || 'default';
+      for (const ref of resourceRefs) {
         if (!ref.kind || !ref.name) continue;
         const refNs = ref.namespace || (['Deployment','Service','Pod','ConfigMap','Secret','ReplicaSet','StatefulSet','DaemonSet'].includes(ref.kind) ? parentNs : null);
         const mEvents = await fetchEvents(ref.kind, ref.name, refNs, contextName);

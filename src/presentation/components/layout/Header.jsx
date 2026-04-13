@@ -6,7 +6,7 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { useState, useRef, useEffect } from 'react';
-import { FiUser, FiLogOut, FiSettings, FiMoon, FiSun, FiServer } from 'react-icons/fi';
+import { FiUser, FiLogOut, FiSettings, FiMoon, FiSun, FiBook } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { SearchBar } from '../common/SearchBar.jsx';
 import { Dialog } from '../common/Dialog.jsx';
@@ -106,6 +106,25 @@ export const Header = ({ sidebarWidth }) => {
         </HStack>
 
         <HStack spacing={2}>
+          <IconButton
+            as="a"
+            href="https://github.com/corpobit/crossview/blob/main/docs/GETTING_STARTED.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open documentation"
+            variant="ghost"
+            size="sm"
+            color={getTextColor(colorMode, 'secondary')}
+            _dark={{ color: getTextColor('dark', 'secondary') }}
+            _hover={{
+              bg: getBackgroundColor(colorMode, 'secondary'),
+              _dark: { bg: getBackgroundColor('dark', 'tertiary') }
+            }}
+            title="Documentation"
+          >
+            <FiBook size={18} />
+          </IconButton>
+
           <IconButton
             aria-label={`Switch to ${colorMode === 'light' ? 'dark' : 'light'} mode`}
             variant="ghost"

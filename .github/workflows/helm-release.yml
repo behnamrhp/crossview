@@ -34,6 +34,14 @@ jobs:
           CLEAN_VERSION="${VERSION#v}"
           TAG="v${CLEAN_VERSION}"
 
+          if [[ ! "$CLEAN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
+            echo "::error::Version '$VERSION' does not follow Semantic Versioning format (vMAJOR.MINOR.PATCH)"
+            echo ""
+            echo "Valid examples: 1.0.0, v2.3.1, v10.5.0, 3.8.0-rc.1"
+            echo "Invalid examples: v1.0, version-2, 1.2.3-beta!"
+            exit 1
+          fi
+
           RELEASES=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' 2>&1) || {
             echo "::error::Failed to fetch releases. Ensure the repository has at least one published release."
             exit 1

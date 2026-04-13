@@ -34,6 +34,11 @@ export const ResourceRelations = ({ resource, relatedResources, colorMode }) => 
             <Text fontSize="xs" color={getTextColor(colorMode, 'secondary')} mt={1}>
               {resource.name}
             </Text>
+            {resource.namespace && resource.namespace !== 'default' && (
+              <Text fontSize="xs" color={getTextColor(colorMode, 'muted')} mt={1}>
+                ns: {resource.namespace}
+              </Text>
+            )}
           </Box>
         ),
       },
@@ -72,6 +77,11 @@ export const ResourceRelations = ({ resource, relatedResources, colorMode }) => 
               >
                 {related.name}
               </Text>
+              {related.namespace && (
+                <Text fontSize="xs" color={getTextColor(colorMode, 'muted')} mt={1}>
+                  ns: {related.namespace}
+                </Text>
+              )}
             </Box>
           ),
         },
@@ -87,7 +97,7 @@ export const ResourceRelations = ({ resource, relatedResources, colorMode }) => 
     });
 
     return [mainNode, ...relatedNodes];
-  }, [resource, relatedResources, colorMode]); // ← added colorMode dependency
+  }, [resource, relatedResources, colorMode]);
 
   const initialEdges = useMemo(() => {
     if (!resource) return [];
@@ -145,6 +155,11 @@ export const ResourceRelations = ({ resource, relatedResources, colorMode }) => 
                   <Text fontSize="xs" color={getTextColor(colorMode, 'secondary')} mt={1}>
                     {resource?.name}
                   </Text>
+                  {resource?.namespace && resource.namespace !== 'default' && (
+                    <Text fontSize="xs" color={getTextColor(colorMode, 'muted')} mt={1}>
+                      ns: {resource.namespace}
+                    </Text>
+                  )}
                 </Box>
               ),
             },
@@ -185,6 +200,11 @@ export const ResourceRelations = ({ resource, relatedResources, colorMode }) => 
                 >
                   {related.name}
                 </Text>
+                {related.namespace && related.namespace !== 'default' && (
+                  <Text fontSize="xs" color={getTextColor(colorMode, 'muted')} mt={1}>
+                    ns: {related.namespace}
+                  </Text>
+                )}
               </Box>
             ),
           },
