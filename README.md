@@ -15,7 +15,7 @@
   [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/crossview)](https://artifacthub.io/packages/search?repo=crossview)
 </div>
 
-![Crossview Dashboard](public/images/dashboard.png)
+![Crossview Dashboard](public/images/new-screeenshot.png)
 
 ### Demo Video
 
