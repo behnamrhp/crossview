@@ -18,4 +18,3 @@
 ### Other
 
 * update GitHub issue templates ([ef268bd](https://github.com/crossplane-contrib/crossview/commit/ef268bdbd54df3037d38a0a79a0f5989696cd98e))
-# Changelog

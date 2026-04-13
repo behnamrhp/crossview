@@ -1,4 +1,7 @@
-FROM node:20-alpine AS frontend-builder
+# syntax=docker/dockerfile:1
+# Run Node and Go on the host arch (BUILDPLATFORM) so linux/arm64 images build on amd64 CI without QEMU crashes.
+# Static JS and CGO_ENABLED=0 Go output remain valid for TARGETPLATFORM.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-builder
 
 WORKDIR /app
 
@@ -10,7 +13,7 @@ COPY . .
 
 RUN npm run build
 
-FROM golang:1.25-alpine AS go-builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS go-builder
 
 ARG TARGETPLATFORM=linux/amd64
 ARG BUILDPLATFORM
