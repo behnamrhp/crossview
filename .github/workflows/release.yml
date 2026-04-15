@@ -384,108 +384,65 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Install ORAS
+      - name: Login to GHCR (Helm OCI)
         run: |
-          curl -LO https://github.com/oras-project/oras/releases/download/v1.3.0/oras_1.3.0_linux_amd64.tar.gz
-          tar -xzf oras_1.3.0_linux_amd64.tar.gz
-          sudo mv oras /usr/local/bin/
-          oras version
-
-      - name: Create Helm config file for OCI push
-        run: |
-          CHART_VERSION="${{ steps.version.outputs.version }}"
-          CHART_NAME=$(grep '^name:' helm/crossview/Chart.yaml | awk '{print $2}')
-          CHART_DESC=$(grep '^description:' helm/crossview/Chart.yaml | sed 's/^description: //' | sed 's/"/\\"/g')
-          
-          printf '{\n  "name": "%s",\n  "version": "%s",\n  "description": "%s"\n}\n' \
-            "$CHART_NAME" "$CHART_VERSION" "$CHART_DESC" > ./charts/helm-config.json
-          
-          cat ./charts/helm-config.json
-
-      - name: Login to GHCR with ORAS
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io \
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
             -u "${{ github.actor }}" \
             --password-stdin
 
-      - name: Push Helm chart to GHCR OCI registry using ORAS
+      - name: Push Helm chart to GHCR OCI registry (Helm OCI)
         run: |
           CHART_VERSION="${{ steps.version.outputs.version }}"
           OCI_REGISTRY="ghcr.io"
           OCI_REPO="${{ github.repository_owner }}/crossview-chart"
-          
           if [ -z "$CHART_FILE" ]; then
             CHART_FILE=$(ls ./charts/*.tgz | head -1)
           fi
-          
           if [ ! -f "$CHART_FILE" ]; then
             echo "Error: Chart file not found: $CHART_FILE"
             echo "Available files in ./charts/:"
             ls -la ./charts/ || echo "charts/ directory does not exist"
             exit 1
           fi
-          
           echo "Pushing Helm chart to OCI registry: oci://$OCI_REGISTRY/$OCI_REPO"
           echo "Chart version: $CHART_VERSION"
           echo "Chart file: $CHART_FILE"
-          
-          oras push $OCI_REGISTRY/$OCI_REPO:$CHART_VERSION \
-            --artifact-type application/vnd.cncf.helm.chart.v1.tar+gzip \
-            --config ./charts/helm-config.json:application/vnd.cncf.helm.config.v1+json \
-            $CHART_FILE:application/tar+gzip || {
+          helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO" || {
             echo "First push attempt failed, retrying..."
             sleep 5
-            oras push $OCI_REGISTRY/$OCI_REPO:$CHART_VERSION \
-              --artifact-type application/vnd.cncf.helm.chart.v1.tar+gzip \
-              --config ./charts/helm-config.json:application/vnd.cncf.helm.config.v1+json \
-              $CHART_FILE:application/tar+gzip
+            helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO"
           }
-          
           echo "Chart pushed successfully to GHCR OCI registry"
-          echo "Users can install with: helm install crossview oci://$OCI_REGISTRY/$OCI_REPO --version ${{ steps.version.outputs.tag }}"
-
-      - name: Login to Docker Hub with ORAS
+          echo "Users can install with: helm install crossview oci://$OCI_REGISTRY/$OCI_REPO --version $CHART_VERSION"
+      - name: Login to Docker Hub (Helm OCI)
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | oras login docker.io \
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | helm registry login registry-1.docker.io \
             -u "${{ secrets.DOCKERHUB_USERNAME }}" \
             --password-stdin
-
-      - name: Push Helm chart to Docker Hub OCI registry using ORAS
+      - name: Push Helm chart to Docker Hub OCI registry (Helm OCI)
         run: |
           CHART_VERSION="${{ steps.version.outputs.version }}"
           OCI_REGISTRY="docker.io"
           OCI_REPO="${{ secrets.DOCKERHUB_USERNAME }}/crossview-chart"
-          
           if [ -z "$CHART_FILE" ]; then
             CHART_FILE=$(ls ./charts/*.tgz | head -1)
           fi
-          
           if [ ! -f "$CHART_FILE" ]; then
             echo "Error: Chart file not found: $CHART_FILE"
             echo "Available files in ./charts/:"
             ls -la ./charts/ || echo "charts/ directory does not exist"
             exit 1
           fi
-          
           echo "Pushing Helm chart to OCI registry: oci://$OCI_REGISTRY/$OCI_REPO"
           echo "Chart version: $CHART_VERSION"
           echo "Chart file: $CHART_FILE"
-          
-          oras push $OCI_REGISTRY/$OCI_REPO:$CHART_VERSION \
-            --artifact-type application/vnd.cncf.helm.chart.v1.tar+gzip \
-            --config ./charts/helm-config.json:application/vnd.cncf.helm.config.v1+json \
-            $CHART_FILE:application/tar+gzip || {
+          helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO" || {
             echo "First push attempt failed, retrying..."
             sleep 5
-            oras push $OCI_REGISTRY/$OCI_REPO:$CHART_VERSION \
-              --artifact-type application/vnd.cncf.helm.chart.v1.tar+gzip \
-              --config ./charts/helm-config.json:application/vnd.cncf.helm.config.v1+json \
-              $CHART_FILE:application/tar+gzip
+            helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO"
           }
-          
           echo "Chart pushed successfully to Docker Hub OCI registry"
-          echo "Users can install with: helm install crossview oci://$OCI_REGISTRY/$OCI_REPO --version ${{ steps.version.outputs.tag }}"
-
+          echo "Users can install with: helm install crossview oci://$OCI_REGISTRY/$OCI_REPO --version $CHART_VERSION"
       - name: Checkout gh-pages branch
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
         uses: actions/checkout@v4
