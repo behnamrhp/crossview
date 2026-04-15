@@ -12,9 +12,11 @@ Deploy Crossview using Helm for the easiest and most flexible installation.
 
 ### Option 1: Install from OCI Registry (Recommended)
 
+The OCI reference ends with the chart name from `Chart.yaml` (`crossview`), so the full path is `crossview-chart/crossview` on GHCR—not a separate product rename.
+
 ```bash
 # Install directly from GHCR OCI registry (recommended - no repo add needed)
-helm install crossview oci://ghcr.io/crossplane-contrib/crossview-chart \
+helm install crossview oci://ghcr.io/crossplane-contrib/crossview-chart/crossview \
   --version v1.6.0 \
   --namespace crossview \
   --create-namespace \
@@ -216,7 +218,7 @@ Or upgrade from OCI registry:
 
 ```bash
 # Upgrade from OCI registry (no repo update needed)
-helm upgrade crossview oci://ghcr.io/crossplane-contrib/crossview-chart \
+helm upgrade crossview oci://ghcr.io/crossplane-contrib/crossview-chart/crossview \
   --version v1.6.0 \
   --namespace crossview \
   --set image.tag=v1.6.0 \
