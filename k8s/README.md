@@ -22,13 +22,7 @@ kubectl apply -f secret.yaml
 
 ### 2. Update Docker Image (Optional)
 
-The default image uses GHCR: `ghcr.io/crossplane-contrib/crossview:latest`
-
-To use Docker Hub instead, edit `deployment.yaml`:
-
-```yaml
-image: crossplane-contrib/crossview:latest
-```
+The default image uses GHCR: `ghcr.io/crossplane-contrib/crossview:latest`. To pin a specific version, edit `image` in `deployment.yaml`.
 
 ### 3. Deploy Everything
 
@@ -215,11 +209,8 @@ kubectl auth can-i get pods --as=system:serviceaccount:crossview:crossview-sa -n
 ## Updating the Application
 
 ```bash
-# Update the image (GHCR - default)
+# Update the image (GHCR)
 kubectl set image deployment/crossview crossview=ghcr.io/crossplane-contrib/crossview:v0.1.0 -n crossview
-
-# Or use Docker Hub (fallback)
-kubectl set image deployment/crossview crossview=crossplane-contrib/crossview:v0.1.0 -n crossview
 
 # Or edit the deployment
 kubectl edit deployment crossview -n crossview

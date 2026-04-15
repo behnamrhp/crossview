@@ -45,17 +45,6 @@ helm install crossview oci://ghcr.io/crossplane-contrib/crossview-chart/crossvie
   --set secrets.sessionSecret=your-session-secret
 ```
 
-Alternative: Docker Hub (if you push there too)
-
-```bash
-helm install crossview oci://docker.io/crossplane-contrib/crossview-chart/crossview \
-  --version 3.5.3 \
-  --namespace crossview \
-  --create-namespace \
-  --set secrets.dbPassword=your-db-password \
-  --set secrets.sessionSecret=your-session-secret
-```
-
 ### For developers / contributors: Install from local chart
 
 Clone the repo and install from source (useful for testing changes):

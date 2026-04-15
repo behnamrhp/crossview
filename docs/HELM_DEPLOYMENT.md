@@ -22,23 +22,11 @@ helm install crossview oci://ghcr.io/crossplane-contrib/crossview-chart \
   --set secrets.sessionSecret=$(openssl rand -base64 32)
 ```
 
-Alternatively, install from Docker Hub OCI registry (fallback):
-
-```bash
-# Install directly from Docker Hub OCI registry
-helm install crossview oci://docker.io/crossplane-contrib/crossview-chart \
-  --version v1.6.0 \
-  --namespace crossview \
-  --create-namespace \
-  --set secrets.dbPassword=your-secure-password \
-  --set secrets.sessionSecret=$(openssl rand -base64 32)
-```
-
 ### Option 2: Install from Helm Repository
 
 ```bash
 # Add the Helm repository
-helm repo add crossview https://corpobit.github.io/crossview
+helm repo add crossview https://crossplane-contrib.github.io/crossview
 helm repo update
 
 # Install Crossview

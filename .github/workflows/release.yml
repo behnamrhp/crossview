@@ -237,12 +237,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Set version and arch from previous job
         id: vars
         run: |
@@ -264,7 +258,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/crossview:${{ steps.vars.outputs.tag }}-${{ steps.vars.outputs.platform_tag }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/crossview:${{ steps.vars.outputs.tag }}-${{ steps.vars.outputs.platform_tag }}
           build-args: |
             TARGETPLATFORM=${{ matrix.platform }}
             TARGETARCH=${{ steps.vars.outputs.arch }}
@@ -296,12 +289,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Create and push multi-arch manifest to GHCR
         run: |
           docker buildx imagetools create --tag ghcr.io/${{ github.repository_owner }}/crossview:${{ steps.version.outputs.tag }} \
@@ -309,14 +296,6 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/crossview:${{ steps.version.outputs.tag }}-linux-arm64
           
           echo "Multi-arch manifest created for GHCR: ${{ steps.version.outputs.tag }}"
-
-      - name: Create and push multi-arch manifest to Docker Hub
-        run: |
-          docker buildx imagetools create --tag ${{ secrets.DOCKERHUB_USERNAME }}/crossview:${{ steps.version.outputs.tag }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/crossview:${{ steps.version.outputs.tag }}-linux-amd64 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/crossview:${{ steps.version.outputs.tag }}-linux-arm64
-          
-          echo "Multi-arch manifest created for Docker Hub: ${{ steps.version.outputs.tag }}"
 
   create-release:
     needs: [build-and-release, create-multi-arch-manifest]
@@ -378,12 +357,6 @@ jobs:
           echo "CHART_FILE=$CHART_FILE" >> $GITHUB_ENV
           echo "Using chart file: $CHART_FILE"
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Login to GHCR (Helm OCI)
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
@@ -413,35 +386,6 @@ jobs:
             helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO"
           }
           echo "Chart pushed successfully to GHCR OCI registry"
-          echo "Users can install with: helm install crossview oci://$OCI_REGISTRY/$OCI_REPO --version $CHART_VERSION"
-      - name: Login to Docker Hub (Helm OCI)
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | helm registry login registry-1.docker.io \
-            -u "${{ secrets.DOCKERHUB_USERNAME }}" \
-            --password-stdin
-      - name: Push Helm chart to Docker Hub OCI registry (Helm OCI)
-        run: |
-          CHART_VERSION="${{ steps.version.outputs.version }}"
-          OCI_REGISTRY="docker.io"
-          OCI_REPO="${{ secrets.DOCKERHUB_USERNAME }}/crossview-chart"
-          if [ -z "$CHART_FILE" ]; then
-            CHART_FILE=$(ls ./charts/*.tgz | head -1)
-          fi
-          if [ ! -f "$CHART_FILE" ]; then
-            echo "Error: Chart file not found: $CHART_FILE"
-            echo "Available files in ./charts/:"
-            ls -la ./charts/ || echo "charts/ directory does not exist"
-            exit 1
-          fi
-          echo "Pushing Helm chart to OCI registry: oci://$OCI_REGISTRY/$OCI_REPO"
-          echo "Chart version: $CHART_VERSION"
-          echo "Chart file: $CHART_FILE"
-          helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO" || {
-            echo "First push attempt failed, retrying..."
-            sleep 5
-            helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO"
-          }
-          echo "Chart pushed successfully to Docker Hub OCI registry"
           echo "Users can install with: helm install crossview oci://$OCI_REGISTRY/$OCI_REPO --version $CHART_VERSION"
       - name: Checkout gh-pages branch
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'

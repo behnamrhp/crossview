@@ -199,7 +199,7 @@ For more details, see:
 docker build -t ghcr.io/crossplane-contrib/crossview:latest .
 ```
 
-Images are automatically published to both GHCR (default) and Docker Hub (fallback) on each release.
+Images are published to **GHCR** (`ghcr.io/crossplane-contrib/crossview`) on each release.
 
 ### Run with Environment Variables (Recommended)
 
