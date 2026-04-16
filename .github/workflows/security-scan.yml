@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner on Dockerfile (table output)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -51,7 +51,7 @@ jobs:
         continue-on-error: true
 
       - name: Run Trivy vulnerability scanner on Dockerfile (SARIF)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -79,7 +79,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
       - name: Scan application Docker image (latest)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: 'crossplane-contrib/crossview:latest'
           format: 'table'
@@ -89,7 +89,7 @@ jobs:
         continue-on-error: true
 
       - name: Scan application Docker image (versioned tag if available)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
         with:
           image-ref: 'ghcr.io/${{ github.repository_owner }}/crossview:${{ github.ref_name }}'
@@ -100,7 +100,7 @@ jobs:
         continue-on-error: true
 
       - name: Scan PostgreSQL image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: 'postgres:16.3-alpine'
           format: 'table'
@@ -134,7 +134,7 @@ jobs:
           npm audit fix --dry-run || true
 
       - name: Run Trivy on package files
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: 'package-lock.json'
@@ -167,7 +167,7 @@ jobs:
           go-version: '1.25'
 
       - name: Run Trivy on Go dependencies
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: 'crossview-go-server'
@@ -178,7 +178,7 @@ jobs:
         continue-on-error: true
 
       - name: Run Trivy on go.sum
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: 'fs'
           scan-ref: 'crossview-go-server/go.sum'

@@ -38,7 +38,23 @@ jobs:
       - name: Validate Chart Schema
         run: |
           cd helm/crossview
-          helm schema validate values.schema.json || echo "Schema validation skipped (helm schema command may not be available)"
+          set +e
+          OUT=$(helm schema validate values.schema.json 2>&1)
+          RC=$?
+          set -e
+          if [ "$RC" -eq 0 ]; then
+            echo "$OUT"
+            echo "values.schema.json validation passed"
+            exit 0
+          fi
+          if echo "$OUT" | grep -qiE 'unknown command|unknown flag|not recognized|No help topic|not found'; then
+            echo "::notice::helm schema validate is not available in this Helm build; skipping schema validation."
+            echo "$OUT"
+            exit 0
+          fi
+          echo "::error::helm schema validate failed"
+          echo "$OUT"
+          exit "$RC"
 
       - name: Test Template Rendering
         run: |

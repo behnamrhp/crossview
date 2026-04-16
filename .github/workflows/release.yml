@@ -3,10 +3,6 @@ name: Build and Release
 on:
   workflow_dispatch: 
     inputs: 
-      version:
-        description: 'Version to release (e.g. v3.9.0)'
-        required: true
-        type: string
       branch:
         description: 'Branch to release from'
         required: true
@@ -21,9 +17,9 @@ on:
         default: false
         type: boolean 
       publish_helm:
-        description: 'Also publish Helm chart for this version'
+        description: 'Publish Helm chart to GHCR (OCI). Packaging also runs when GitHub Pages update is enabled.'
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
@@ -71,9 +67,6 @@ jobs:
         run: |
           echo "Checking for npm vulnerabilities..."
           npm audit --audit-level=moderate || echo "⚠️ Some vulnerabilities found, but continuing build"
-
-      - name: Build application
-        run: npm run build
 
       - name: Fetch all tags
         run: |
@@ -149,6 +142,9 @@ jobs:
         run: |
           npm version ${{ steps.version.outputs.version }} --no-git-tag-version --allow-same-version
           echo "Updated package.json to version ${{ steps.version.outputs.version }}"
+
+      - name: Build application
+        run: npm run build
 
       - name: Update Helm Chart.yaml
         run: |
@@ -333,11 +329,13 @@ jobs:
           fail_on_unmatched_files: true
 
       - name: Set up Helm
+        if: github.event.inputs.publish_helm == 'true' || github.event.inputs.update_github_pages == 'true'
         uses: azure/setup-helm@v3
         with:
           version: '3.13.0'
 
       - name: Update Helm Chart.yaml with version
+        if: github.event.inputs.publish_helm == 'true' || github.event.inputs.update_github_pages == 'true'
         run: |
           CHART_VERSION="${{ steps.version.outputs.version }}"
           CHART_TAG="${{ steps.version.outputs.tag }}"
@@ -348,6 +346,7 @@ jobs:
           cat helm/crossview/Chart.yaml
 
       - name: Package Helm chart
+        if: github.event.inputs.publish_helm == 'true' || github.event.inputs.update_github_pages == 'true'
         run: |
           mkdir -p ./charts
           helm package helm/crossview --destination ./charts
@@ -358,12 +357,14 @@ jobs:
           echo "Using chart file: $CHART_FILE"
 
       - name: Login to GHCR (Helm OCI)
+        if: github.event.inputs.publish_helm == 'true'
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
             -u "${{ github.actor }}" \
             --password-stdin
 
       - name: Push Helm chart to GHCR OCI registry (Helm OCI)
+        if: github.event.inputs.publish_helm == 'true'
         run: |
           CHART_VERSION="${{ steps.version.outputs.version }}"
           OCI_REGISTRY="ghcr.io"
