@@ -7,9 +7,20 @@ on:
         description: 'Version to publish — must match an existing GitHub release (e.g., 3.8.0 or v3.8.0)'
         required: true
         type: string
+      publish_oci:
+        description: 'Push chart package to GHCR (OCI)'
+        required: false
+        default: true
+        type: boolean
+      update_github_pages:
+        description: 'Update GitHub Pages Helm repo (gh-pages branch)'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   validate-version:
@@ -141,10 +152,38 @@ jobs:
 
       - name: Package Helm chart
         run: |
+          mkdir -p ./charts
           helm package helm/crossview --destination ./charts
           ls -la ./charts/
 
+      - name: Login to GHCR (Helm OCI)
+        if: github.event.inputs.publish_oci == 'true'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            -u "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Push Helm chart to GHCR (OCI)
+        if: github.event.inputs.publish_oci == 'true'
+        env:
+          CHART_VERSION: ${{ needs.validate-version.outputs.version }}
+        run: |
+          OCI_REGISTRY="ghcr.io"
+          OCI_REPO="${{ github.repository_owner }}/crossview-chart"
+          CHART_FILE=$(ls ./charts/*.tgz | head -1)
+          if [ ! -f "$CHART_FILE" ]; then
+            echo "::error::Chart package not found under ./charts/"
+            exit 1
+          fi
+          echo "Pushing Helm chart to oci://$OCI_REGISTRY/$OCI_REPO (version $CHART_VERSION)"
+          helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO" || {
+            echo "First push attempt failed, retrying..."
+            sleep 5
+            helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO"
+          }
+
       - name: Checkout gh-pages branch
+        if: github.event.inputs.update_github_pages == 'true'
         uses: actions/checkout@v4
         with:
           ref: gh-pages
@@ -153,6 +192,7 @@ jobs:
           fetch-depth: 0
 
       - name: Initialize gh-pages if empty
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           if [ ! -f gh-pages/index.yaml ]; then
             echo "Initializing gh-pages branch"
@@ -168,23 +208,27 @@ jobs:
           fi
 
       - name: Create charts directory if it doesn't exist
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           mkdir -p gh-pages/charts
           mkdir -p gh-pages/images
 
       - name: Copy new chart package and logo
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           cp charts/*.tgz gh-pages/charts/
           cp public/images/crossview-logo.svg gh-pages/images/crossview-logo.svg
           cp public/images/helm-logo.svg gh-pages/images/helm-logo.svg
 
       - name: Update Helm repository index
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           cd gh-pages
           helm repo index . --url https://crossplane-contrib.github.io/crossview
           cat index.yaml
 
       - name: Create index.html for GitHub Pages
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           cd gh-pages
           cat > index.html << 'EOF'
@@ -358,6 +402,7 @@ jobs:
           EOF
 
       - name: Create Artifact Hub repository metadata
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           cd gh-pages
           cat > artifacthub-repo.yml << 'EOF'
@@ -367,6 +412,7 @@ jobs:
           cat artifacthub-repo.yml
 
       - name: Clean up gh-pages branch
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           cd gh-pages
           find . -type f ! -name 'index.yaml' ! -name 'index.html' ! -name 'artifacthub-repo.yml' ! -name '*.tgz' ! -name 'README.md' ! -name '*.svg' ! -path './charts/*' ! -path './images/*' ! -path './.git/*' -delete 2>/dev/null || true
@@ -375,6 +421,7 @@ jobs:
           mkdir -p charts images
 
       - name: Commit and push to gh-pages
+        if: github.event.inputs.update_github_pages == 'true'
         run: |
           cd gh-pages
           git config user.name "github-actions[bot]"

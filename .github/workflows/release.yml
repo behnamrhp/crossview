@@ -1,30 +1,23 @@
+# Release version = package.json "version" on the commit you run this workflow against.
+# Bump package.json (merge to your default branch), then run workflow from that branch.
+
 name: Build and Release
 
 on:
   workflow_dispatch: 
     inputs: 
-      branch:
-        description: 'Branch to release from'
-        required: true
-        default: 'main'
-        type: choice
-        options:
-          - main
-          - pre-release
       update_github_pages:
-        description: 'Update GitHub Pages Helm repository'
+        description: 'After the GitHub Release, run workflow "Helm Chart Release" with gh-pages repo update'
         required: false
         default: false
         type: boolean 
       publish_helm:
-        description: 'Publish Helm chart to GHCR (OCI). Packaging also runs when GitHub Pages update is enabled.'
+        description: 'After the GitHub Release, run workflow "Helm Chart Release" with OCI publish (GHCR)'
         required: false
         default: true
         type: boolean
 
 jobs:
-
-
   build-and-release:
     environment: production
     runs-on: ubuntu-latest
@@ -32,9 +25,9 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
-      post_release_sha: ${{ steps.commit.outputs.post_release_sha }}
+      release_sha: ${{ steps.meta.outputs.release_sha }}
     permissions:
-      contents: write
+      contents: read
       packages: write
       security-events: write
     
@@ -69,119 +62,40 @@ jobs:
           echo "Checking for npm vulnerabilities..."
           npm audit --audit-level=moderate || echo "⚠️ Some vulnerabilities found, but continuing build"
 
-      - name: Fetch all tags
-        run: |
-          git fetch --tags --force
-          echo "All tags:"
-          git tag --list "v*" | sort -V
-
-      - name: Calculate next version
+      - name: Read version from package.json
         id: version
         run: |
-          git fetch --tags --force
-          BRANCH="${{ github.event.inputs.branch }}"
-
-          LATEST_STABLE=$(git tag --list "v*" | grep -v "-" | sort -V | tail -n1)
-          echo "Latest stable tag: $LATEST_STABLE"
-
-          if [ -z "$LATEST_STABLE" ]; then
-            BASE_VERSION="0.1.0"
-          else
-            VERSION=${LATEST_STABLE#v}
-            MAJOR=$(echo $VERSION | cut -d. -f1)
-            MINOR=$(echo $VERSION | cut -d. -f2)
-            PATCH=$(echo $VERSION | cut -d. -f3)
-
-            if [ "$MAJOR" = "0" ]; then
-              if [ "$MINOR" -lt 9 ]; then
-                BASE_VERSION="0.$((MINOR+1)).0"
-              else
-                BASE_VERSION="1.0.0"
-              fi
-            else
-              if [ "$MINOR" -lt 9 ]; then
-                BASE_VERSION="$MAJOR.$((MINOR+1)).0"
-              else
-                BASE_VERSION="$((MAJOR+1)).0.0"
-              fi
-            fi
-          fi
-
-          if [ "$BRANCH" = "pre-release" ]; then
-            EXISTING_RC=$(git tag --list "v${BASE_VERSION}-rc.*" | sort -V | tail -n1)
-
-            if [ -z "$EXISTING_RC" ]; then
-              RC_NUMBER=1
-            else
-              LAST_RC=${EXISTING_RC##*.}
-              RC_NUMBER=$((LAST_RC+1))
-            fi
-
-            NEW_VERSION="${BASE_VERSION}-rc.${RC_NUMBER}"
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          if [[ "$VERSION" =~ -[a-zA-Z0-9] ]]; then
             IS_PRERELEASE=true
           else
-            NEW_VERSION="${BASE_VERSION}"
             IS_PRERELEASE=false
           fi
-
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-
-          echo "New version: $NEW_VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "Releasing package.json version $VERSION (git tag $TAG)"
 
       - name: Validate semantic versioning format
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
-            echo "::error::Version '$VERSION' does not follow Semantic Versioning format (MAJOR.MINOR.PATCH[-PRERELEASE])"
+            echo "::error::package.json version '$VERSION' is not valid SemVer (MAJOR.MINOR.PATCH[-PRERELEASE])"
             exit 1
           fi
           echo "Version '$VERSION' is valid SemVer"
 
-      - name: Update package.json version
-        run: |
-          npm version ${{ steps.version.outputs.version }} --no-git-tag-version --allow-same-version
-          echo "Updated package.json to version ${{ steps.version.outputs.version }}"
-
       - name: Build application
         run: npm run build
 
-      - name: Update Helm Chart.yaml
+      - name: Generate release notes (no repo file changes)
         run: |
-          sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}/" helm/crossview/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${{ steps.version.outputs.tag }}\"/" helm/crossview/Chart.yaml
-          sed -i "s|ghcr.io/crossplane-contrib/crossview:[0-9]\+\.[0-9]\+\.[0-9]\+|ghcr.io/crossplane-contrib/crossview:${{ steps.version.outputs.tag }}|" helm/crossview/Chart.yaml
-          echo "Updated Chart.yaml:"
-          cat helm/crossview/Chart.yaml
-
-      - name: Update README.md version references
-        run: |
-          echo "README.md version references updated (if any)"
-
-      - name: Update docs/HELM_DEPLOYMENT.md version references
-        run: |
-          sed -i "s/v0\.[0-9]\+\.[0-9]\+/v${{ steps.version.outputs.version }}/g" docs/HELM_DEPLOYMENT.md || true
-          sed -i "s/v1\.[0-9]\+\.[0-9]\+/v${{ steps.version.outputs.version }}/g" docs/HELM_DEPLOYMENT.md || true
-          echo "Updated HELM_DEPLOYMENT.md"
-
-      - name: Update helm/crossview/README.md version references
-        run: |
-          sed -i "s/v0\.[0-9]\+\.[0-9]\+/v${{ steps.version.outputs.version }}/g" helm/crossview/README.md || true
-          sed -i "s/v1\.[0-9]\+\.[0-9]\+/v${{ steps.version.outputs.version }}/g" helm/crossview/README.md || true
-          echo "Updated helm/crossview/README.md"
-
-      - name: Generate changelog and release notes
-        run: |
-          npx --yes conventional-changelog-cli@5.0.0 -p angular -i CHANGELOG.md -s
-          if head -1 CHANGELOG.md | grep -q '^## \['; then
-            { echo '# Changelog'; echo ''; cat CHANGELOG.md; } > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
-          fi
-          npx --yes conventional-changelog-cli@5.0.0 -p angular -u -o RELEASE_NOTES.md
+          npx --yes conventional-changelog-cli@5.0.0 -p angular -u -o RELEASE_NOTES.md || true
           if [ ! -s RELEASE_NOTES.md ]; then
             echo "## Release ${{ steps.version.outputs.tag }}" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
-            echo "No conventional-commit entries since the last tag." >> RELEASE_NOTES.md
+            echo "See [changelog](https://github.com/${{ github.repository }}/commits) for details." >> RELEASE_NOTES.md
           fi
 
       - name: Upload release notes
@@ -191,23 +105,9 @@ jobs:
           path: RELEASE_NOTES.md
           retention-days: 14
 
-      - name: Commit version updates
-        id: commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json helm/crossview/Chart.yaml CHANGELOG.md
-          if git diff --staged --quiet; then
-            echo "No version changes to commit"
-            echo "post_release_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            git commit -m "Bump version to ${{ steps.version.outputs.version }}"
-            if ! git push origin "HEAD:${{ github.ref_name }}"; then
-              echo "::error::Failed to push version bump to ${{ github.ref_name }}. Allow github-actions[bot] to bypass branch protection, or use a PAT with contents: write. The release is aborted so images and tags stay consistent with the repo."
-              exit 1
-            fi
-            echo "post_release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Record release commit
+        id: meta
+        run: echo "release_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
   build-docker-images:
     needs: build-and-release
@@ -221,10 +121,10 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout code (version bump commit)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.build-and-release.outputs.post_release_sha }}
+          ref: ${{ needs.build-and-release.outputs.release_sha }}
           fetch-depth: 0
 
       - name: Set up Docker Buildx
@@ -304,12 +204,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
+      actions: write
     steps:
-      - name: Checkout code (version bump commit)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.build-and-release.outputs.post_release_sha }}
+          ref: ${{ needs.build-and-release.outputs.release_sha }}
           fetch-depth: 0
 
       - name: Set version from previous job
@@ -334,319 +234,16 @@ jobs:
           draft: false
           prerelease: ${{ needs.build-and-release.outputs.is_prerelease }}
           fail_on_unmatched_files: true
-          target_commitish: ${{ needs.build-and-release.outputs.post_release_sha }}
+          target_commitish: ${{ needs.build-and-release.outputs.release_sha }}
 
-      - name: Set up Helm
+      - name: Start Helm chart release workflow
         if: github.event.inputs.publish_helm == 'true' || github.event.inputs.update_github_pages == 'true'
-        uses: azure/setup-helm@v3
-        with:
-          version: '3.13.0'
-
-      - name: Update Helm Chart.yaml with version
-        if: github.event.inputs.publish_helm == 'true' || github.event.inputs.update_github_pages == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CHART_VERSION="${{ steps.version.outputs.version }}"
-          CHART_TAG="${{ steps.version.outputs.tag }}"
-          sed -i "s/^version:.*/version: $CHART_VERSION/" helm/crossview/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"$CHART_TAG\"/" helm/crossview/Chart.yaml
-          sed -i "s|ghcr.io/crossplane-contrib/crossview:v[0-9]\+\.[0-9]\+\.[0-9]\+|ghcr.io/crossplane-contrib/crossview:$CHART_TAG|" helm/crossview/Chart.yaml
-          echo "Updated Chart.yaml to version $CHART_VERSION (appVersion: $CHART_TAG):"
-          cat helm/crossview/Chart.yaml
-
-      - name: Package Helm chart
-        if: github.event.inputs.publish_helm == 'true' || github.event.inputs.update_github_pages == 'true'
-        run: |
-          mkdir -p ./charts
-          helm package helm/crossview --destination ./charts
-          echo "Chart package created:"
-          ls -la ./charts/
-          CHART_FILE=$(ls ./charts/*.tgz | head -1)
-          echo "CHART_FILE=$CHART_FILE" >> $GITHUB_ENV
-          echo "Using chart file: $CHART_FILE"
-
-      - name: Login to GHCR (Helm OCI)
-        if: github.event.inputs.publish_helm == 'true'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
-            -u "${{ github.actor }}" \
-            --password-stdin
-
-      - name: Push Helm chart to GHCR OCI registry (Helm OCI)
-        if: github.event.inputs.publish_helm == 'true'
-        run: |
-          CHART_VERSION="${{ steps.version.outputs.version }}"
-          OCI_REGISTRY="ghcr.io"
-          OCI_REPO="${{ github.repository_owner }}/crossview-chart"
-          if [ -z "$CHART_FILE" ]; then
-            CHART_FILE=$(ls ./charts/*.tgz | head -1)
-          fi
-          if [ ! -f "$CHART_FILE" ]; then
-            echo "Error: Chart file not found: $CHART_FILE"
-            echo "Available files in ./charts/:"
-            ls -la ./charts/ || echo "charts/ directory does not exist"
-            exit 1
-          fi
-          echo "Pushing Helm chart to OCI registry: oci://$OCI_REGISTRY/$OCI_REPO"
-          echo "Chart version: $CHART_VERSION"
-          echo "Chart file: $CHART_FILE"
-          helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO" || {
-            echo "First push attempt failed, retrying..."
-            sleep 5
-            helm push "$CHART_FILE" "oci://$OCI_REGISTRY/$OCI_REPO"
-          }
-          echo "Chart pushed successfully to GHCR OCI registry"
-          echo "Users can install with: helm install crossview oci://$OCI_REGISTRY/$OCI_REPO --version $CHART_VERSION"
-      - name: Checkout gh-pages branch
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: gh-pages
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      - name: Initialize gh-pages if empty
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          if [ ! -f gh-pages/index.yaml ]; then
-            echo "Initializing gh-pages branch"
-            cd gh-pages
-            echo "apiVersion: v1" > index.yaml
-            echo "entries: {}" >> index.yaml
-            mkdir -p charts
-                git config user.name "github-actions[bot]"
-                git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add index.yaml
-            git commit -m "Initial Helm chart repository" || true
-            git push origin gh-pages || true
-          fi
-
-      - name: Create charts directory if it doesn't exist
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          mkdir -p gh-pages/charts
-          mkdir -p gh-pages/images
-
-      - name: Copy new chart package and logo
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          cp charts/*.tgz gh-pages/charts/
-          cp public/images/crossview-logo.svg gh-pages/images/crossview-logo.svg
-          cp public/images/helm-logo.svg gh-pages/images/helm-logo.svg
-
-      - name: Update Helm repository index
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          cd gh-pages
-          helm repo index . --url https://crossplane-contrib.github.io/crossview
-          cat index.yaml
-
-      - name: Create index.html for GitHub Pages
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          cd gh-pages
-          cat > index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Crossview Helm Charts</title>
-            <meta name="description" content="Official Helm chart repository for Crossview">
-            <style>
-              :root {
-                --natural-50:  #fafaf9;
-                --natural-100: #f5f5f4;
-                --natural-200: #e7e5e4;
-                --natural-300: #d6d3d1;
-                --natural-400: #a8a29e;
-                --natural-500: #78716c;
-                --natural-600: #57534e;
-                --natural-700: #44403c;
-                --natural-800: #292524;
-                --natural-900: #1c1917;
-                --natural-950: #0c0a09;
-                --bg:        var(--natural-50);
-                --text:      var(--natural-900);
-                --muted:     var(--natural-600);
-                --accent:    var(--natural-800);
-              }
-              body {
-                margin: 0;
-                background: var(--bg);
-                color: var(--text);
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                line-height: 1.6;
-                min-height: 100vh;
-              }
-              .container {
-                max-width: 840px;
-                margin: 0 auto;
-                padding: 100px 24px 140px;
-              }
-              header {
-                text-align: center;
-                margin-bottom: 90px;
-              }
-              .logo {
-                width: 150px;
-                height: 150px;
-                margin-bottom: 28px;
-                opacity: 0.9;
-              }
-              h1 {
-                font-size: 3rem;
-                font-weight: 600;
-                margin: 0 0 12px 0;
-                color: var(--accent);
-              }
-              .tagline {
-                font-size: 1.2rem;
-                color: var(--muted);
-              }
-              h2 {
-                font-size: 1.5rem;
-                margin: 64px 0 20px 0;
-                color: var(--accent);
-                display: flex;
-                align-items: center;
-                gap: 12px;
-              }
-              h2::before {
-                content: "$";
-                color: #16a34a;
-                font-weight: bold;
-              }
-              pre {
-                background: var(--natural-100);
-                color: var(--natural-900);
-                padding: 28px;
-                border-radius: 12px;
-                font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-                font-size: 15.5px;
-                line-height: 1.6;
-                overflow-x: auto;
-                position: relative;
-                margin: 0;
-                border: 1px solid var(--natural-200);
-              }
-              .copy {
-                position: absolute;
-                top: 14px;
-                right: 16px;
-                background: var(--natural-200);
-                color: var(--natural-800);
-                border: 1px solid var(--natural-300);
-                padding: 6px 12px;
-                border-radius: 6px;
-                font-size: 13px;
-                cursor: pointer;
-                opacity: 0;
-                transition: opacity 0.2s;
-              }
-              pre:hover .copy { opacity: 1; }
-              .copy:hover { background: var(--natural-300); }
-              .footer {
-                text-align: center;
-                margin-top: 120px;
-                color: var(--muted);
-                font-size: 0.95rem;
-              }
-              .footer a {
-                color: var(--accent);
-                text-decoration: none;
-              }
-              .footer a:hover { text-decoration: underline; }
-              @media (max-width: 640px) {
-                .container { padding: 60px 16px; }
-                h1 { font-size: 2.4rem; }
-                pre { padding: 20px; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <header>
-                <img src="images/crossview-logo.svg" alt="Crossview" class="logo">
-                <h1>Crossview Helm Charts</h1>
-                <p class="tagline">Official Helm repository for Crossview – Crossplane visualization platform</p>
-              </header>
-              <h2>Install from OCI Registry (Recommended)</h2>
-              <pre><code id="oci-install">helm install crossview oci://ghcr.io/crossplane-contrib/crossview-chart/crossview \
-          --namespace crossview \
-          --create-namespace</code>
-                <button class="copy" onclick="copy(this)">Copy</button>
-              </pre>
-              <h2>Add Helm Repository</h2>
-              <pre><code id="add">helm repo add crossview https://crossplane-contrib.github.io/crossview
-          helm repo update</code>
-                <button class="copy" onclick="copy(this)">Copy</button>
-              </pre>
-              <h2>Install from Repository</h2>
-              <pre><code id="install">helm install crossview crossview/crossview \
-          --namespace crossview \
-            --create-namespace</code>
-                <button class="copy" onclick="copy(this)">Copy</button>
-              </pre>
-              <h2>Upgrade</h2>
-              <pre><code id="upgrade">helm upgrade crossview crossview/crossview \
-            --namespace crossview</code>
-                <button class="copy" onclick="copy(this)">Copy</button>
-              </pre>
-              <div class="footer">
-                <p>
-                  <a href="https://github.com/crossplane-contrib/crossview" target="_blank">GitHub</a> •
-                  <a href="index.yaml">index.yaml</a> •
-                  Hosted on GitHub Pages
-                </p>
-              </div>
-            </div>
-            <script>
-              function copy(btn) {
-                const code = btn.previousElementSibling.textContent.trim();
-                navigator.clipboard.writeText(code).then(() => {
-                  const original = btn.textContent;
-                  btn.textContent = "Copied!";
-                  setTimeout(() => btn.textContent = original, 1500);
-                });
-              }
-            </script>
-          </body>
-          </html>
-          EOF
-
-      - name: Create Artifact Hub repository metadata
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          cd gh-pages
-          cat > artifacthub-repo.yml << 'EOF'
-          repositoryID: d73e91d5-f8ca-4b1a-bea7-b274f432462c
-          EOF
-          echo "Created artifacthub-repo.yml:"
-          cat artifacthub-repo.yml
-
-      - name: Clean up gh-pages branch
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          cd gh-pages
-          find . -type f ! -name 'index.yaml' ! -name 'index.html' ! -name 'artifacthub-repo.yml' ! -name '*.tgz' ! -name 'README.md' ! -name '*.svg' ! -path './charts/*' ! -path './images/*' ! -path './.git/*' -delete 2>/dev/null || true
-          find . -type d ! -name '.git' ! -name 'charts' ! -name 'images' ! -name '.' -empty -delete 2>/dev/null || true
-          rm -rf dist build config logs node_modules src public .github 2>/dev/null || true
-          mkdir -p charts images
-
-      - name: Commit and push to gh-pages
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_github_pages == 'true'
-        run: |
-          cd gh-pages
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull origin gh-pages --rebase || git pull origin gh-pages --no-rebase || true
-          git checkout gh-pages || git checkout -b gh-pages
-          git add .
-          git clean -fd -e .git || true
-          if git diff --staged --quiet && git diff --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update Helm chart to version ${{ steps.version.outputs.version }}"
-            git push origin gh-pages || git push origin gh-pages --force-with-lease
-          fi
+          gh workflow run helm-release.yml \
+            --ref "${{ github.ref_name }}" \
+            -f "version=${{ needs.build-and-release.outputs.version }}" \
+            -f "publish_oci=${{ github.event.inputs.publish_helm }}" \
+            -f "update_github_pages=${{ github.event.inputs.update_github_pages }}"
+          echo "Triggered Helm Chart Release for version ${{ needs.build-and-release.outputs.version }} (OCI=${{ github.event.inputs.publish_helm }}, Pages=${{ github.event.inputs.update_github_pages }}). Track it under Actions."
