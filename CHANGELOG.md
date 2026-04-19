@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1](https://github.com/behnamrhp/crossview/compare/v1.0.0...v1.0.1) (2026-04-19)
+
+### Bug Fixes
+
+* **pipeline:** Bump package json version with semantic versioning ([7ddbff3](https://github.com/behnamrhp/crossview/commit/7ddbff3e853ac68699fcf5173ae0f2a7aefd2b24))
+
 ## 1.0.0 (2026-04-19)
 
 ### Features
