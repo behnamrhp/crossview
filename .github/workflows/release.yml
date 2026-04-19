@@ -1,16 +1,18 @@
-# Release version = package.json "version" on the commit you run this workflow against.
-# Bump package.json (merge to your default branch), then run workflow from that branch.
+# CHANGELOG.md and package.json versions are bumped by semantic-release from conventional commits.
+# Run from main or master. Optional secret SEMANTIC_RELEASE_GITHUB_TOKEN (PAT with contents:write)
+# improves push reliability and can trigger workflows on the release commit; if unset,
+# GITHUB_TOKEN is used as GH_TOKEN / GITHUB_TOKEN per semantic-release documentation.
 
 name: Build and Release
 
 on:
-  workflow_dispatch: 
-    inputs: 
+  workflow_dispatch:
+    inputs:
       update_github_pages:
         description: 'After the GitHub Release, run workflow "Helm Chart Release" with gh-pages repo update'
         required: false
         default: false
-        type: boolean 
+        type: boolean
       publish_helm:
         description: 'After the GitHub Release, run workflow "Helm Chart Release" with OCI publish (GHCR)'
         required: false
@@ -18,8 +20,83 @@ on:
         type: boolean
 
 jobs:
-  build-and-release:
+  semantic-release:
     environment: production
+    runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.meta.outputs.released }}
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      release_sha: ${{ steps.meta.outputs.release_sha }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.SEMANTIC_RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Run Go tests
+        working-directory: crossview-go-server
+        run: go test ./...
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install --no-save @rollup/rollup-linux-x64-gnu || true
+
+      - name: Run npm audit
+        run: |
+          echo "Checking for npm vulnerabilities..."
+          npm audit --audit-level=moderate || echo "⚠️ Some vulnerabilities found, but continuing build"
+
+      - name: Run semantic-release
+        env:
+          GH_TOKEN: ${{ secrets.SEMANTIC_RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SEMANTIC_RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: npx semantic-release --ci
+
+      - name: Set release outputs
+        id: meta
+        run: |
+          if [ -f .semantic-release-version ]; then
+            VERSION=$(tr -d '\n\r' < .semantic-release-version)
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            if [[ "$VERSION" =~ -[a-zA-Z0-9] ]]; then
+              echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            fi
+            echo "Published release $VERSION (tag v${VERSION}) at $(git rev-parse HEAD)"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "release_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "No new semantic version published (nothing releasable on this branch)."
+          fi
+
+  build-and-release:
+    needs: semantic-release
+    if: needs.semantic-release.result == 'success' && needs.semantic-release.outputs.released == 'true'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -30,11 +107,11 @@ jobs:
       contents: read
       packages: write
       security-events: write
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.semantic-release.outputs.release_sha }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -76,6 +153,11 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "Releasing package.json version $VERSION (git tag $TAG)"
+          EXPECTED="${{ needs.semantic-release.outputs.version }}"
+          if [ "$VERSION" != "$EXPECTED" ]; then
+            echo "::error::package.json version '$VERSION' does not match semantic-release output '$EXPECTED'"
+            exit 1
+          fi
 
       - name: Validate semantic versioning format
         run: |
@@ -89,9 +171,15 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Generate release notes (no repo file changes)
+      - name: Generate release notes from CHANGELOG
         run: |
-          npx --yes conventional-changelog-cli@5.0.0 -p angular -u -o RELEASE_NOTES.md || true
+          awk '
+            /^#+ \[[0-9]+\.[0-9]+\.[0-9]+/ {
+              if (seen) exit
+              seen = 1
+            }
+            seen { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
           if [ ! -s RELEASE_NOTES.md ]; then
             echo "## Release ${{ steps.version.outputs.tag }}" > RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
@@ -107,7 +195,7 @@ jobs:
 
       - name: Record release commit
         id: meta
-        run: echo "release_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        run: echo "release_sha=${{ needs.semantic-release.outputs.release_sha }}" >> "$GITHUB_OUTPUT"
 
   build-docker-images:
     needs: build-and-release
@@ -196,7 +284,7 @@ jobs:
           docker buildx imagetools create --tag ghcr.io/${{ github.repository_owner }}/crossview:${{ steps.version.outputs.tag }} \
             ghcr.io/${{ github.repository_owner }}/crossview:${{ steps.version.outputs.tag }}-linux-amd64 \
             ghcr.io/${{ github.repository_owner }}/crossview:${{ steps.version.outputs.tag }}-linux-arm64
-          
+
           echo "Multi-arch manifest created for GHCR: ${{ steps.version.outputs.tag }}"
 
   create-release:
