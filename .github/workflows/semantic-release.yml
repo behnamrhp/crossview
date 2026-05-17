@@ -6,10 +6,6 @@ name: Semantic Release
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
 
 concurrency:
   group: semantic-release-${{ github.repository }}-${{ github.ref }}
